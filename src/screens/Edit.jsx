@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   BUBBLES,
-  ICON_MAP,
   FILTERS,
   FRAMES,
   DEFAULT_PHOTO,
@@ -22,15 +21,6 @@ import { OPEN_SHAPES, SHAPES } from '../shapes.js'
 const TABS = ['Frames', 'Filters', 'Stickers', 'Draw', 'Text', 'Photo']
 const INK_COLORS = ['#030a2e', '#ffffff', '#ff5fa2', '#ffd23f', '#2ee6a6', '#3ca2fa', '#2460e7', '#ff8a3d']
 const INK_SIZES = [8, 18, 36]
-
-function Icon({ id, color, size = 44 }) {
-  const i = ICON_MAP[id]
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
-      <path d={i.path} fill={color || i.color} fillRule="evenodd" stroke="#030a2e" strokeWidth="1.6" strokeLinejoin="round" />
-    </svg>
-  )
-}
 const TEXT_COLORS = ['#ffd23f', '#ff5fa2', '#2ee6a6', '#3ca2fa', '#ffffff', '#ff8a3d']
 const fitSize = (len) => clamp(0.62 / (0.34 * (0.62 * len + 1)), 0.08, 0.45)
 const uid = () => Math.random().toString(36).slice(2, 9)
@@ -326,7 +316,7 @@ export default function Edit({ custom = [], layout, shots, edit, setEdit, onReta
               </button>
               {[...(edit.doodles || []), ...custom, ...STICKERS].map((s) => (
                 <button key={s.id} className="opt sticker" {...dragProps(s)} aria-label={`Add ${s.id} sticker`} onClick={() => addSticker(s)}>
-                  {s.kind === 'img' ? <img src={s.src} alt="" /> : s.kind === 'icon' ? <Icon id={s.icon} /> : <span className="emoji">{s.value}</span>}
+                  {s.kind === 'img' ? <img src={s.src} alt="" /> : <span className="emoji">{s.value}</span>}
                 </button>
               ))}
             </div>

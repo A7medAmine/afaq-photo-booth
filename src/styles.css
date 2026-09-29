@@ -707,3 +707,4 @@ img { -webkit-user-drag: none; }
 .row-tight { display: flex; gap: 10px; }
 .row-tight input { flex: 1; min-width: 0; }
 .row-tight .btn { font-size: 18px; padding: 8px 16px; }
+.shape-grid .tool { display: grid; place-items: center; padding: 10px 0; }

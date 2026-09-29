@@ -197,37 +197,6 @@ export const FRAMES = [
   },
 ]
 
-export const ICONS = [
-  { id: 'robot', color: '#3ca2fa', path: 'M11 2h2v2.2h4a3 3 0 0 1 3 3V17a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3V7.2a3 3 0 0 1 3-3h4zM8.5 9a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4zm7 0a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4zM8.5 15h7v1.5h-7z' },
-  { id: 'bolt', color: '#ffd23f', path: 'M13 2L4 14h6l-1 8 9-12h-6z' },
-  { id: 'rocket', color: '#ff5fa2', path: 'M12 2c3 2 5 6 5 10l2 3v3l-3-1.5H8L5 18v-3l2-3c0-4 2-8 5-10zM12 8.5a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4z' },
-  { id: 'bulb', color: '#ffd23f', path: 'M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2zM9 19h6v1.5a1.5 1.5 0 0 1-1.5 1.5h-3A1.5 1.5 0 0 1 9 20.5z' },
-  { id: 'smile', color: '#ffd23f', path: 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zM8.5 8.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3zm7 0a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3zM7 14h10a5 5 0 0 1-10 0z' },
-  { id: 'star', color: '#ffd23f', path: 'M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z' },
-  { id: 'heart', color: '#ff5fa2', path: 'M12 21s-8-5.6-8-11.2C4 6.6 6.2 4.5 8.7 4.5c1.5 0 2.7.8 3.3 1.9.6-1.1 1.8-1.9 3.3-1.9 2.5 0 4.7 2.1 4.7 5.3C20 15.4 12 21 12 21z' },
-  { id: 'flame', color: '#ff8a3d', path: 'M12 2c1 4 5 6 5 11a5 5 0 0 1-10 0c0-2 1-3.5 2-4.5 0 2 1 3 2 3 0-3-1-5 1-9.5z' },
-  { id: 'sparkle', color: '#2ee6a6', path: 'M12 2l2.2 7.8L22 12l-7.8 2.2L12 22l-2.2-7.8L2 12l7.8-2.2z' },
-  { id: 'gamepad', color: '#2460e7', path: 'M6 8h12a4 4 0 0 1 4 4v3a3 3 0 0 1-5.2 2L15 15H9l-1.8 2A3 3 0 0 1 2 15v-3a4 4 0 0 1 4-4zM7 10v1.5H5.5V13H7v1.5h1.5V13H10v-1.5H8.5V10zM16 11.5a1 1 0 1 0 0 2 1 1 0 0 0 0-2zm2.5 1a1 1 0 1 0 0 2 1 1 0 0 0 0-2z' },
-  { id: 'crown', color: '#ffd23f', path: 'M3 8l4.5 4L12 5l4.5 7L21 8l-2 11H5z' },
-  { id: 'moon', color: '#3ca2fa', path: 'M20 14.5A8.5 8.5 0 0 1 9.5 4 8.5 8.5 0 1 0 20 14.5z' },
-  { id: 'cloud', color: '#ffffff', path: 'M7 18a4 4 0 0 1-.5-7.97A6 6 0 0 1 18 9.5 4.3 4.3 0 0 1 17.5 18z' },
-  { id: 'note', color: '#ff5fa2', path: 'M9 3v12.3A3.5 3.5 0 1 0 11 18.5V7.5l8-2V13a3.5 3.5 0 1 0 2 3.2V3z' },
-].map((i) => ({ ...i, path2d: typeof Path2D === 'undefined' ? null : new Path2D(i.path) }))
-export const ICON_MAP = Object.fromEntries(ICONS.map((i) => [i.id, i]))
-
-function paintIcon(ctx, icon, size, color, outline) {
-  ctx.save()
-  ctx.scale(size / 24, size / 24)
-  ctx.translate(-12, -12)
-  ctx.fillStyle = color
-  ctx.lineJoin = 'round'
-  ctx.lineWidth = 1.6
-  ctx.strokeStyle = outline
-  ctx.fill(icon.path2d, 'evenodd')
-  ctx.stroke(icon.path2d)
-  ctx.restore()
-}
-
 export const STICKERS = [
   { id: 'robocar', kind: 'img', src: '/assets/robocar-removed-bg.webp', size: 0.49 },
   { id: 'uno', kind: 'img', src: '/assets/uno.webp', size: 0.44 },
@@ -238,7 +207,12 @@ export const STICKERS = [
   { id: 'screwdriver', kind: 'img', src: '/assets/screwdriver.webp', size: 0.44 },
   { id: 'bord', kind: 'img', src: '/assets/bord.webp', size: 0.44 },
   { id: 'logo', kind: 'img', src: '/assets/main.webp', size: 0.29, round: true },
-  ...ICONS.map((i) => ({ id: `i-${i.id}`, kind: 'icon', icon: i.id, color: i.color, size: 0.2 })),
+  ...['1f916', '26a1', '1f680', '1f527', '1f4a1', '1f389', '1f60e', '2b50', '2764-fe0f', '1f525', '1f47e', '1f3ae'].map((c) => ({
+    id: `e-${c}`,
+    kind: 'img',
+    src: `/assets/emoji/${c}.png`,
+    size: 0.2,
+  })),
 ]
 
 export const BUBBLES = [
@@ -295,7 +269,7 @@ export function stickerBox(ctx, s, W) {
     const ar = img ? img.naturalHeight / img.naturalWidth : 1
     return { w, h: s.round ? w : w * ar }
   }
-  if (s.kind === 'emoji' || s.kind === 'icon') {
+  if (s.kind === 'emoji') {
     const w = s.size * W
     return { w, h: w }
   }
@@ -344,8 +318,6 @@ function drawSticker(ctx, s, W, H) {
         ctx.drawImage(img, -box.w / 2, -box.h / 2, box.w, box.h)
       }
     }
-  } else if (s.kind === 'icon') {
-    paintIcon(ctx, ICON_MAP[s.icon], box.w, s.color, INK)
   } else if (s.kind === 'emoji') {
     ctx.font = `${box.w * 0.85}px "Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif`
     ctx.textAlign = 'center'
@@ -534,6 +506,7 @@ export function renderComposite(canvas, state, opts = {}) {
   canvas.height = Math.round(H * scale)
   const ctx = canvas.getContext('2d')
   ctx.setTransform(scale, 0, 0, scale, 0, 0)
+  ctx.imageSmoothingQuality = 'high'
   const frame = FRAMES.find((f) => f.id === state.frameId) || FRAMES[0]
   const filter = (FILTERS.find((f) => f.id === state.filterId) || FILTERS[0]).css
 
