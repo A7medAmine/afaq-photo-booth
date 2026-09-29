@@ -3,11 +3,13 @@ import VideoView from '../VideoView.jsx'
 import { grabStill } from '../camera.js'
 import { LAYOUTS } from '../compose.js'
 import { beep } from '../sound.js'
+import { useI18n } from '../i18n.jsx'
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms))
 
 export default function Capture({ cam, layout, onDone, onCancel }) {
   const L = LAYOUTS[layout]
+  const { t } = useI18n()
   const videoRef = useRef(null)
   const [count, setCount] = useState(null)
   const [index, setIndex] = useState(0)
@@ -68,26 +70,26 @@ export default function Capture({ cam, layout, onDone, onCancel }) {
 
   return (
     <main className="screen capture">
-      <button className="btn btn-ghost cancel" onClick={onCancel}>Cancel</button>
+      <button className="btn btn-ghost cancel" onClick={onCancel}>{t('cap.cancel')}</button>
       <div className="cap-stage">
         <div className="cap-frame" style={{ aspectRatio: aspect, '--ar': aspect }}>
           <VideoView stream={cam.stream} mirror={mirror} videoRef={videoRef} className="live" />
-          {count === null && <div className="cap-msg">Get ready</div>}
+          {count === null && <div className="cap-msg">{t('cap.ready')}</div>}
           {count > 0 && (
             <div key={count} className="digit" aria-live="assertive">{count}</div>
           )}
-          {count === 0 && <div className="cap-msg smile">Smile!</div>}
+          {count === 0 && <div className="cap-msg smile">{t('cap.smile')}</div>}
           {flash && <div className="flash" />}
         </div>
       </div>
       <div className="cap-side">
         <p className="cap-progress">
-          {L.shots > 1 ? `Photo ${Math.min(index + 1, L.shots)} of ${L.shots}` : 'Look at the camera'}
+          {L.shots > 1 ? t('cap.progress', { n: Math.min(index + 1, L.shots), total: L.shots }) : t('cap.look')}
         </p>
         <div className="thumbs">
           {Array.from({ length: L.shots }).map((_, i) => (
             <div className="thumb" key={i}>
-              {thumbs[i] ? <img src={thumbs[i]} alt={`Shot ${i + 1}`} /> : <span>{i + 1}</span>}
+              {thumbs[i] ? <img src={thumbs[i]} alt={t('cap.shot', { n: i + 1 })} /> : <span>{i + 1}</span>}
             </div>
           ))}
         </div>

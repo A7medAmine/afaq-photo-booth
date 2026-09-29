@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useI18n } from '../i18n.jsx'
 import ColorSwatches from './ColorSwatches.jsx'
 import ToolIcon from './ToolIcon.jsx'
+import BrushSize from './BrushSize.jsx'
 import { OPEN_SHAPES, SHAPES, shapePath } from '../shapes.js'
 
 const SIZE = 800
@@ -132,6 +134,7 @@ function cropToContent(canvas) {
 }
 
 export default function Doodle({ colors = [], onAddColor, onCancel, onDone }) {
+  const { t } = useI18n()
   const boardRef = useRef(null)
   const canvasRef = useRef(null)
   const committed = useRef(null)
@@ -310,7 +313,7 @@ export default function Doodle({ colors = [], onAddColor, onCancel, onDone }) {
   const canFill = tool === 'shape' && !OPEN_SHAPES.has(shape)
 
   return (
-    <div className="modal" role="dialog" aria-modal="true" aria-label="Draw a sticker">
+    <div className="modal" role="dialog" aria-modal="true" aria-label={t('doodle.title')}>
       <div className="doodle-card">
         <div className="doodle-board" ref={boardRef}>
           <canvas
@@ -326,14 +329,14 @@ export default function Doodle({ colors = [], onAddColor, onCancel, onDone }) {
             aria-label="Drawing area"
           />
           <div className="zoom-ctl">
-            <button className="tool" aria-label="Zoom out" onClick={() => zoomCenter(1 / 1.5)} disabled={view.s <= MIN_ZOOM}>−</button>
-            <button className="tool zoom-val" aria-label="Reset zoom" onClick={() => setView({ s: 1, tx: 0, ty: 0 })}>{Math.round(view.s * 100)}%</button>
-            <button className="tool" aria-label="Zoom in" onClick={() => zoomCenter(1.5)} disabled={view.s >= MAX_ZOOM}>+</button>
+            <button className="tool" aria-label={t('doodle.zoomOut')} onClick={() => zoomCenter(1 / 1.5)} disabled={view.s <= MIN_ZOOM}>−</button>
+            <button className="tool zoom-val" aria-label={t('doodle.zoomReset')} onClick={() => setView({ s: 1, tx: 0, ty: 0 })}>{Math.round(view.s * 100)}%</button>
+            <button className="tool" aria-label={t('doodle.zoomIn')} onClick={() => zoomCenter(1.5)} disabled={view.s >= MAX_ZOOM}>+</button>
           </div>
         </div>
 
         <div className="doodle-tools">
-          <h2>Draw your sticker</h2>
+          <h2>{t('doodle.title')}</h2>
 
           <ColorSwatches
             base={COLORS}
@@ -350,12 +353,12 @@ export default function Doodle({ colors = [], onAddColor, onCancel, onDone }) {
             }}
           />
 
-          <div className="tool-grid" role="radiogroup" aria-label="Tool">
+          <div className="tool-grid" role="radiogroup" aria-label={t('edit.tool')}>
             {[
-              ['pen', 'Pen'],
-              ['fill', 'Fill'],
-              ['erase', 'Eraser'],
-              ['pan', 'Move'],
+              ['pen', t('edit.pen')],
+              ['fill', t('doodle.fill')],
+              ['erase', t('edit.eraser')],
+              ['pan', t('doodle.move')],
             ].map(([id, label]) => (
               <button key={id} role="radio" aria-checked={tool === id} className={`tool ${tool === id ? 'on' : ''}`} onClick={() => pickTool(id)}>
                 <span className="tool-icon"><ToolIcon name={id} /></span>
@@ -364,14 +367,14 @@ export default function Doodle({ colors = [], onAddColor, onCancel, onDone }) {
             ))}
           </div>
 
-          <div className="shape-grid" role="radiogroup" aria-label="Shape">
+          <div className="shape-grid" role="radiogroup" aria-label={t('edit.shape')}>
             {SHAPES.map((s) => (
               <button
                 key={s.id}
                 role="radio"
                 aria-checked={tool === 'shape' && shape === s.id}
-                aria-label={s.label}
-                title={s.label}
+                aria-label={t(`shape.${s.id}`)}
+                title={t(`shape.${s.id}`)}
                 className={`tool shape ${tool === 'shape' && shape === s.id ? 'on' : ''}`}
                 onClick={() => {
                   setShape(s.id)
@@ -384,28 +387,20 @@ export default function Doodle({ colors = [], onAddColor, onCancel, onDone }) {
           </div>
           {canFill && (
             <button className={`tool wide ${filled ? 'on' : ''}`} onClick={() => setFilled((f) => !f)} aria-pressed={filled}>
-              {filled ? 'Filled shape' : 'Outline only'}
+              {filled ? t('edit.filled') : t('edit.outline')}
             </button>
           )}
 
-          {drawsLine && (
-            <div className="brushes" role="radiogroup" aria-label="Brush size">
-              {BRUSHES.map((b) => (
-                <button key={b} role="radio" aria-checked={size === b} aria-label={`Brush ${b}`} className={`brush ${size === b ? 'on' : ''}`} onClick={() => setSize(b)}>
-                  <span style={{ width: b * 0.9, height: b * 0.9 }} />
-                </button>
-              ))}
-            </div>
-          )}
+          {drawsLine && <BrushSize value={size} onChange={setSize} presets={BRUSHES} />}
 
           <div className="doodle-actions">
-            <button className="tool wide" onClick={() => setOps((o) => o.slice(0, -1))} disabled={!ops.length}>Undo</button>
-            <button className="tool wide" onClick={() => setOps([])} disabled={!ops.length}>Clear</button>
+            <button className="tool wide" onClick={() => setOps((o) => o.slice(0, -1))} disabled={!ops.length}>{t('edit.undo')}</button>
+            <button className="tool wide" onClick={() => setOps([])} disabled={!ops.length}>{t('doodle.clear')}</button>
           </div>
 
           <div className="doodle-foot">
-            <button className="btn btn-ghost" onClick={onCancel}>Cancel</button>
-            <button className="btn btn-sun big" onClick={finish} disabled={!hasInk}>Use sticker</button>
+            <button className="btn btn-ghost" onClick={onCancel}>{t('cap.cancel')}</button>
+            <button className="btn btn-sun big" onClick={finish} disabled={!hasInk}>{t('doodle.use')}</button>
           </div>
         </div>
       </div>

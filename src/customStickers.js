@@ -40,8 +40,88 @@ async function toSticker(rec) {
   return { id: rec.id, kind: 'img', src, size: 0.4, custom: true }
 }
 
+const HIDDEN_KEY = 'afaq-hidden-stickers'
+const GROUPS_KEY = 'afaq-sticker-groups'
+
+export const DEFAULT_GROUPS = [
+  { id: 'mine', name: 'Mine' },
+  { id: 'club', name: 'Club' },
+  { id: 'faces', name: 'Faces' },
+  { id: 'fun', name: 'Fun' },
+  { id: 'tech', name: 'Tech' },
+]
+
+export const groupOf = (s, assign) => assign[s.id] ?? s.group ?? 'mine'
+
+function load(key, fallback) {
+  try {
+    const v = JSON.parse(localStorage.getItem(key))
+    return v ?? fallback
+  } catch {
+    return fallback
+  }
+}
+
+function save(key, value) {
+  try {
+    localStorage.setItem(key, JSON.stringify(value))
+  } catch { /* storage unavailable */ }
+}
+
+function loadHidden() {
+  const v = load(HIDDEN_KEY, [])
+  return Array.isArray(v) ? v : []
+}
+
+function loadGroups() {
+  const v = load(GROUPS_KEY, null)
+  return v && Array.isArray(v.groups) ? { groups: v.groups, assign: v.assign || {} } : { groups: DEFAULT_GROUPS, assign: {} }
+}
+
 export function useCustomStickers() {
   const [list, setList] = useState([])
+  const [grp, setGrp] = useState(loadGroups)
+  const [hidden, setHidden] = useState(loadHidden)
+
+  const saveHidden = useCallback((next) => {
+    setHidden(next)
+    save(HIDDEN_KEY, next)
+  }, [])
+
+  const toggleBuiltin = useCallback(
+    (id) => saveHidden(hidden.includes(id) ? hidden.filter((h) => h !== id) : [...hidden, id]),
+    [hidden, saveHidden],
+  )
+  const updateGroups = useCallback((fn) => {
+    setGrp((g) => {
+      const next = fn(g)
+      save(GROUPS_KEY, next)
+      return next
+    })
+  }, [])
+  const addGroup = useCallback(
+    (name) => {
+      const n = name.trim()
+      if (!n) return null
+      const id = `g-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`
+      updateGroups((g) => ({ ...g, groups: [...g.groups, { id, name: n }] }))
+      return id
+    },
+    [updateGroups],
+  )
+  const renameGroup = useCallback(
+    (id, name) => updateGroups((g) => ({ ...g, groups: g.groups.map((x) => (x.id === id ? { ...x, name } : x)) })),
+    [updateGroups],
+  )
+  const deleteGroup = useCallback(
+    (id) => updateGroups((g) => ({ groups: g.groups.filter((x) => x.id !== id), assign: g.assign })),
+    [updateGroups],
+  )
+  const assignGroup = useCallback(
+    (stickerId, groupId) => updateGroups((g) => ({ ...g, assign: { ...g.assign, [stickerId]: groupId } })),
+    [updateGroups],
+  )
+  const setAllBuiltin = useCallback((ids) => saveHidden(ids), [saveHidden])
 
   useEffect(() => {
     let dead = false
@@ -54,7 +134,7 @@ export function useCustomStickers() {
     }
   }, [])
 
-  const add = useCallback(async (files) => {
+  const add = useCallback(async (files, groupId) => {
     const made = []
     for (const f of files) {
       if (!f.type.startsWith('image/')) continue
@@ -63,12 +143,17 @@ export function useCustomStickers() {
       made.push(await toSticker(rec))
     }
     setList((l) => [...l, ...made])
-  }, [])
+    if (groupId && made.length)
+      updateGroups((g) => ({ ...g, assign: { ...g.assign, ...Object.fromEntries(made.map((m) => [m.id, groupId])) } }))
+  }, [updateGroups])
 
   const remove = useCallback(async (id) => {
     await tx('readwrite', (s) => s.delete(id))
     setList((l) => l.filter((s) => s.id !== id))
   }, [])
 
-  return { list, add, remove }
+  return {
+    list, add, remove, hidden, toggleBuiltin, setAllBuiltin,
+    groups: grp.groups, assign: grp.assign, addGroup, renameGroup, deleteGroup, assignGroup,
+  }
 }

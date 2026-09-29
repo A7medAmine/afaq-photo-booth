@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  BUBBLES,
+  BUBBLE_COLORS,
   FILTERS,
   FRAMES,
   DEFAULT_PHOTO,
@@ -16,9 +16,13 @@ import {
 import Doodle from './Doodle.jsx'
 import ColorSwatches from './ColorSwatches.jsx'
 import ToolIcon from './ToolIcon.jsx'
+import BrushSize from './BrushSize.jsx'
+import { groupOf } from '../customStickers.js'
 import { OPEN_SHAPES, SHAPES } from '../shapes.js'
+import { BUBBLE_TEXT, useI18n } from '../i18n.jsx'
 
-const TABS = ['Frames', 'Filters', 'Stickers', 'Draw', 'Text', 'Photo']
+const TABS = [['Frames', 'edit.frames'], ['Filters', 'edit.filters'], ['Stickers', 'edit.stickers'], ['Draw', 'edit.draw'], ['Text', 'edit.text'], ['Photo', 'edit.photo']]
+const DEFAULT_GROUP_NAMES = { mine: 'Mine', club: 'Club', faces: 'Faces', fun: 'Fun', tech: 'Tech' }
 const INK_COLORS = ['#030a2e', '#ffffff', '#ff5fa2', '#ffd23f', '#2ee6a6', '#3ca2fa', '#2460e7', '#ff8a3d']
 const INK_SIZES = [8, 18, 36]
 const TEXT_COLORS = ['#ffd23f', '#ff5fa2', '#2ee6a6', '#3ca2fa', '#ffffff', '#ff8a3d']
@@ -26,20 +30,22 @@ const fitSize = (len) => clamp(0.62 / (0.34 * (0.62 * len + 1)), 0.08, 0.45)
 const uid = () => Math.random().toString(36).slice(2, 9)
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v))
 
-function Mini({ layout, shots, frameId, filterId, caption, width = 96 }) {
+function Mini({ layout, shots, frameId, filterId, caption, lang, width = 96 }) {
   const ref = useRef(null)
   useEffect(() => {
     const { W } = getLayout(layout, shots)
-    renderComposite(ref.current, { layout, shots, frameId, filterId, caption, stickers: [] }, { scale: width / W })
-  }, [layout, shots, frameId, filterId, caption, width])
+    renderComposite(ref.current, { layout, shots, frameId, filterId, caption, lang, stickers: [] }, { scale: width / W })
+  }, [layout, shots, frameId, filterId, caption, lang, width])
   return <canvas ref={ref} className="mini" />
 }
 
-export default function Edit({ custom = [], layout, shots, edit, setEdit, onRetake, onFinish }) {
+export default function Edit({ custom = [], hidden = [], groups: allGroups = [], assign = {}, layout, shots, edit, setEdit, onRetake, onExit, onFinish }) {
+  const { t, lang } = useI18n()
   const [tab, setTab] = useState('Frames')
   const [selectedId, setSelectedId] = useState(null)
   const [busy, setBusy] = useState(false)
   const [drawing, setDrawing] = useState(false)
+  const [group, setGroup] = useState('all')
   const [customText, setCustomText] = useState('')
   const [textColor, setTextColor] = useState(TEXT_COLORS[0])
   const [inkColor, setInkColor] = useState(INK_COLORS[2])
@@ -51,7 +57,7 @@ export default function Edit({ custom = [], layout, shots, edit, setEdit, onReta
   const drag = useRef(null)
   const L = useMemo(() => getLayout(layout, shots), [layout, shots])
 
-  const state = useMemo(() => ({ layout, shots, ...edit }), [layout, shots, edit])
+  const state = useMemo(() => ({ layout, shots, lang, ...edit }), [layout, shots, lang, edit])
 
   const [tick, setTick] = useState(0)
   useEffect(() => {
@@ -204,6 +210,13 @@ export default function Edit({ custom = [], layout, shots, edit, setEdit, onReta
     drag.current = null
   }
 
+  const visible = STICKERS.filter((s) => !hidden.includes(s.id))
+  const mine = [...(edit.doodles || []), ...custom]
+  const inGroup = (s, id) => groupOf(s, assign) === id
+  const groups = allGroups.filter((g) => [...mine, ...visible].some((s) => inGroup(s, g.id)))
+  const active = groups.some((g) => g.id === group) ? group : 'all'
+  const shown = active === 'all' ? [...mine, ...visible] : [...mine, ...visible].filter((s) => inGroup(s, active))
+
   const selected = edit.stickers.find((s) => s.id === selectedId)
   const tweak = (fn) => selected && patchSticker(selected.id, fn)
   const remove = () => {
@@ -261,26 +274,26 @@ export default function Edit({ custom = [], layout, shots, edit, setEdit, onReta
           onPointerCancel={onUp}
           onDragOver={(e) => e.preventDefault()}
           onDrop={onDropSticker}
-          aria-label="Your photo. Drag stickers to move them."
+          aria-label={t('edit.canvas')}
         />
-        <div className={`sticker-bar ${selected ? 'on' : ''}`} role="toolbar" aria-label="Selected sticker">
-          <button className="tool" aria-label="Smaller" onClick={() => tweak((s) => ({ size: clamp(s.size * 0.88, 0.08, 0.9) }))}>−</button>
-          <button className="tool" aria-label="Bigger" onClick={() => tweak((s) => ({ size: clamp(s.size * 1.14, 0.08, 0.9) }))}>+</button>
-          <button className="tool" aria-label="Turn left" onClick={() => tweak((s) => ({ rot: s.rot - 0.2 }))}>↺</button>
-          <button className="tool" aria-label="Turn right" onClick={() => tweak((s) => ({ rot: s.rot + 0.2 }))}>↻</button>
-          <button className="tool wide" onClick={toFront}>Bring to front</button>
-          <button className="tool danger wide" onClick={remove}>Remove</button>
+        <div className={`sticker-bar ${selected ? 'on' : ''}`} role="toolbar" aria-label={t('edit.selected')}>
+          <button className="tool" aria-label={t('edit.smaller')} onClick={() => tweak((s) => ({ size: clamp(s.size * 0.88, 0.08, 0.9) }))}>−</button>
+          <button className="tool" aria-label={t('edit.bigger')} onClick={() => tweak((s) => ({ size: clamp(s.size * 1.14, 0.08, 0.9) }))}>+</button>
+          <button className="tool" aria-label={t('edit.turnLeft')} onClick={() => tweak((s) => ({ rot: s.rot - 0.2 }))}>↺</button>
+          <button className="tool" aria-label={t('edit.turnRight')} onClick={() => tweak((s) => ({ rot: s.rot + 0.2 }))}>↻</button>
+          <button className="tool wide" onClick={toFront}>{t('edit.front')}</button>
+          <button className="tool danger wide" onClick={remove}>{t('edit.remove')}</button>
         </div>
       </section>
 
       <aside className="panel">
         <div className="tabs" role="tablist">
-          {TABS.map((t) => (
-            <button key={t} role="tab" aria-selected={tab === t} className={`tab ${tab === t ? 'on' : ''}`} onClick={() => {
-                setTab(t)
+          {TABS.map(([id, label]) => (
+            <button key={id} role="tab" aria-selected={tab === id} className={`tab ${tab === id ? 'on' : ''}`} onClick={() => {
+                setTab(id)
                 setSelectedId(null)
               }}>
-              {t}
+              {t(label)}
             </button>
           ))}
         </div>
@@ -290,8 +303,8 @@ export default function Edit({ custom = [], layout, shots, edit, setEdit, onReta
             <div className="grid minis">
               {FRAMES.map((f) => (
                 <button key={f.id} className={`opt ${edit.frameId === f.id ? 'on' : ''}`} onClick={() => patchEdit({ frameId: f.id })}>
-                  <Mini layout={layout} shots={shots} caption={edit.caption} filterId={edit.filterId} frameId={f.id} />
-                  <span>{f.name}</span>
+                  <Mini layout={layout} shots={shots} caption={edit.caption} lang={lang} filterId={edit.filterId} frameId={f.id} />
+                  <span>{t(`frame.${f.id}`)}</span>
                 </button>
               ))}
             </div>
@@ -301,8 +314,8 @@ export default function Edit({ custom = [], layout, shots, edit, setEdit, onReta
             <div className="grid minis">
               {FILTERS.map((f) => (
                 <button key={f.id} className={`opt ${edit.filterId === f.id ? 'on' : ''}`} onClick={() => patchEdit({ filterId: f.id })}>
-                  <Mini layout={layout} shots={shots} caption={edit.caption} frameId={edit.frameId} filterId={f.id} />
-                  <span>{f.name}</span>
+                  <Mini layout={layout} shots={shots} caption={edit.caption} lang={lang} frameId={edit.frameId} filterId={f.id} />
+                  <span>{t(`filter.${f.id}`)}</span>
                 </button>
               ))}
             </div>
@@ -312,10 +325,17 @@ export default function Edit({ custom = [], layout, shots, edit, setEdit, onReta
             <div className="grid stickers">
               <button className="opt sticker draw-btn" onClick={() => setDrawing(true)}>
                 <span className="emoji">✏️</span>
-                <span>Draw one</span>
+                <span>{t('edit.drawOne')}</span>
               </button>
-              {[...(edit.doodles || []), ...custom, ...STICKERS].map((s) => (
-                <button key={s.id} className="opt sticker" {...dragProps(s)} aria-label={`Add ${s.id} sticker`} onClick={() => addSticker(s)}>
+              <div className="chips" role="tablist" aria-label={t('edit.groups')}>
+                {[{ id: 'all', name: t('edit.all') }, ...groups].map((g) => (
+                  <button key={g.id} role="tab" aria-selected={active === g.id} className={`chip ${active === g.id ? 'on' : ''}`} onClick={() => setGroup(g.id)}>
+                    {g.id !== 'all' && DEFAULT_GROUP_NAMES[g.id] === g.name ? t(`group.${g.id}`) : g.name}
+                  </button>
+                ))}
+              </div>
+              {shown.map((s) => (
+                <button key={s.id} className="opt sticker" {...dragProps(s)} aria-label={`${t('edit.addSticker')} ${s.id}`} onClick={() => addSticker(s)}>
                   {s.kind === 'img' ? <img src={s.src} alt="" /> : <span className="emoji">{s.value}</span>}
                 </button>
               ))}
@@ -324,24 +344,24 @@ export default function Edit({ custom = [], layout, shots, edit, setEdit, onReta
 
           {tab === 'Draw' && (
             <div className="draw-tab">
-              <p className="hint">Draw right on your photo with your finger.</p>
+              <p className="hint">{t('edit.drawHint')}</p>
               <ColorSwatches base={INK_COLORS} custom={edit.colors} value={inkColor} onPick={setInkColor} onAdd={addColor} />
-              <div className="tool-grid two" role="radiogroup" aria-label="Tool">
-                {[['pen', 'Pen'], ['erase', 'Eraser']].map(([id, label]) => (
+              <div className="tool-grid two" role="radiogroup" aria-label={t('edit.tool')}>
+                {[['pen', t('edit.pen')], ['erase', t('edit.eraser')]].map(([id, label]) => (
                   <button key={id} role="radio" aria-checked={drawTool === id} className={`tool ${drawTool === id ? 'on' : ''}`} onClick={() => setDrawTool(id)}>
                     <span className="tool-icon"><ToolIcon name={id} /></span>
                     <span>{label}</span>
                   </button>
                 ))}
               </div>
-              <div className="shape-grid" role="radiogroup" aria-label="Shape">
+              <div className="shape-grid" role="radiogroup" aria-label={t('edit.shape')}>
                 {SHAPES.map((s) => (
                   <button
                     key={s.id}
                     role="radio"
                     aria-checked={drawTool === 'shape' && shape === s.id}
-                    aria-label={s.label}
-                    title={s.label}
+                    aria-label={t(`shape.${s.id}`)}
+                    title={t(`shape.${s.id}`)}
                     className={`tool shape ${drawTool === 'shape' && shape === s.id ? 'on' : ''}`}
                     onClick={() => {
                       setShape(s.id)
@@ -354,87 +374,102 @@ export default function Edit({ custom = [], layout, shots, edit, setEdit, onReta
               </div>
               {drawTool === 'shape' && !OPEN_SHAPES.has(shape) && (
                 <button className={`tool wide ${filled ? 'on' : ''}`} onClick={() => setFilled((f) => !f)} aria-pressed={filled}>
-                  {filled ? 'Filled shape' : 'Outline only'}
+                  {filled ? t('edit.filled') : t('edit.outline')}
                 </button>
               )}
-              <div className="brushes" role="radiogroup" aria-label="Brush size">
-                {INK_SIZES.map((b) => (
-                  <button key={b} role="radio" aria-checked={inkSize === b} aria-label={`Brush ${b}`} className={`brush ${inkSize === b ? 'on' : ''}`} onClick={() => setInkSize(b)}>
-                    <span style={{ width: b * 0.9, height: b * 0.9 }} />
-                  </button>
-                ))}
-              </div>
+              <BrushSize value={inkSize} onChange={setInkSize} presets={INK_SIZES} />
               <div className="doodle-actions">
-                <button className="tool wide" disabled={!(edit.ink || []).length} onClick={() => patchEdit({ ink: edit.ink.slice(0, -1) })}>Undo</button>
-                <button className="tool wide" disabled={!(edit.ink || []).length} onClick={() => patchEdit({ ink: [] })}>Clear drawing</button>
+                <button className="tool wide" disabled={!(edit.ink || []).length} onClick={() => patchEdit({ ink: edit.ink.slice(0, -1) })}>{t('edit.undo')}</button>
+                <button className="tool wide" disabled={!(edit.ink || []).length} onClick={() => patchEdit({ ink: [] })}>{t('edit.clearDrawing')}</button>
               </div>
             </div>
           )}
 
           {tab === 'Photo' && (
             <div className="photo-tab">
-              <p className="hint">Drag the photo to move it. Zoom in to crop closer.</p>
-              <label className="field">
-                Zoom
-                <input
-                  type="range"
-                  min="1"
-                  max="3"
-                  step="0.05"
-                  value={(edit.photo || DEFAULT_PHOTO).zoom}
-                  onChange={(e) => {
-                    const zoom = Number(e.target.value)
-                    const p = edit.photo || DEFAULT_PHOTO
-                    const { mx, my } = panLimits(shots[0], L.slots[0], zoom)
-                    patchEdit({ photo: { zoom, ox: clamp(p.ox, -mx, mx), oy: clamp(p.oy, -my, my) } })
-                  }}
-                />
-              </label>
-              <button className="btn btn-ghost" onClick={() => patchEdit({ photo: DEFAULT_PHOTO })}>Show the whole photo</button>
-              {layout === 'strip' && <p className="note">Zoom and position apply to all 3 photos.</p>}
+              <p className="hint">{t('edit.panHint')}</p>
+              {(() => {
+                const p = edit.photo || DEFAULT_PHOTO
+                const setZoom = (z) => {
+                  const zoom = clamp(Math.round(z * 100) / 100, 1, 4)
+                  const { mx, my } = panLimits(shots[0], L.slots[0], zoom)
+                  patchEdit({ photo: { zoom, ox: clamp(p.ox, -mx, mx), oy: clamp(p.oy, -my, my) } })
+                }
+                const nudge = (dx, dy) => {
+                  const { mx, my } = panLimits(shots[0], L.slots[0], p.zoom)
+                  patchEdit({ photo: { zoom: p.zoom, ox: clamp(p.ox + dx, -mx, mx), oy: clamp(p.oy + dy, -my, my) } })
+                }
+                const canMove = p.zoom > 1
+                return (
+                  <>
+                    <div className="crop-zoom">
+                      <div className="brush-head"><span>{t('edit.zoom')}</span><span className="brush-num">{Math.round(p.zoom * 100)}%</span></div>
+                      <div className="brush-row">
+                        <button className="tool" aria-label="-" onClick={() => setZoom(p.zoom - 0.25)} disabled={p.zoom <= 1}>−</button>
+                        <input type="range" min="1" max="4" step="0.05" value={p.zoom} aria-label={t('edit.zoom')} style={{ '--pct': `${((p.zoom - 1) / 3) * 100}%` }} onChange={(e) => setZoom(Number(e.target.value))} />
+                        <button className="tool" aria-label="+" onClick={() => setZoom(p.zoom + 0.25)} disabled={p.zoom >= 4}>+</button>
+                      </div>
+                      <div className="crop-presets">
+                        {[1, 1.5, 2, 3].map((z) => (
+                          <button key={z} className={`tool ${Math.abs(p.zoom - z) < 0.03 ? 'on' : ''}`} onClick={() => setZoom(z)}>{z}×</button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="crop-pad" role="group" aria-label={t('edit.move')}>
+                      <button className="tool up" aria-label="Up" disabled={!canMove} onClick={() => nudge(0, -0.05)}>▲</button>
+                      <button className="tool left" aria-label="Left" disabled={!canMove} onClick={() => nudge(-0.05, 0)}>◀</button>
+                      <button className="tool mid" aria-label={t('edit.center')} disabled={!canMove} onClick={() => patchEdit({ photo: { zoom: p.zoom, ox: 0, oy: 0 } })}>●</button>
+                      <button className="tool right" aria-label="Right" disabled={!canMove} onClick={() => nudge(0.05, 0)}>▶</button>
+                      <button className="tool down" aria-label="Down" disabled={!canMove} onClick={() => nudge(0, 0.05)}>▼</button>
+                    </div>
+                  </>
+                )
+              })()}
+              <button className="btn btn-ghost" onClick={() => patchEdit({ photo: DEFAULT_PHOTO })}>{t('edit.whole')}</button>
+              {layout === 'strip' && <p className="note">{t('edit.zoomAll')}</p>}
             </div>
           )}
 
           {tab === 'Text' && (
             <div className="text-tab">
               <label className="field">
-                Message on the frame (bottom line)
+                {t('edit.caption')}
                 <input
                   type="text"
                   maxLength={26}
                   value={edit.caption}
-                  placeholder="Opening Day + today's date"
+                  placeholder={t('edit.captionPh')}
                   onChange={(e) => patchEdit({ caption: e.target.value })}
                 />
               </label>
               <div className="field">
-                Add your own text
+                {t('edit.ownText')}
                 <input
                   type="text"
                   maxLength={30}
                   value={customText}
-                  placeholder="Type anything"
+                  placeholder={t('edit.ownTextPh')}
                   onChange={(e) => setCustomText(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && addText()}
                 />
               </div>
-              <div className="swatches" role="radiogroup" aria-label="Text colour">
+              <div className="swatches" role="radiogroup" aria-label={t('edit.textColor')}>
                 {TEXT_COLORS.map((c) => (
                   <button
                     key={c}
                     role="radio"
                     aria-checked={textColor === c}
-                    aria-label={`Text colour ${c}`}
+                    aria-label={`${t('edit.textColor')} ${c}`}
                     className={`swatch ${textColor === c ? 'on' : ''}`}
                     style={{ background: c }}
                     onClick={() => setTextColor(c)}
                   />
                 ))}
               </div>
-              <button className="btn btn-sun" onClick={addText} disabled={!customText.trim()}>Add text to photo</button>
-              <p className="hint">Quick speech bubbles</p>
+              <button className="btn btn-sun" onClick={addText} disabled={!customText.trim()}>{t('edit.addText')}</button>
+              <p className="hint">{t('edit.bubbles')}</p>
               <div className="bubbles">
-                {BUBBLES.map((b) => (
+                {BUBBLE_TEXT[lang].map((text, i) => ({ text, color: BUBBLE_COLORS[i] })).map((b) => (
                   <button
                     key={b.text}
                     {...dragProps({ kind: 'text', text: b.text, color: b.color, size: 0.3 })}
@@ -451,8 +486,9 @@ export default function Edit({ custom = [], layout, shots, edit, setEdit, onReta
         </div>
 
         <div className="panel-foot">
-          <button className="btn btn-ghost" onClick={onRetake} disabled={busy}>Retake</button>
-          <button className="btn btn-sun big" onClick={finish} disabled={busy}>{busy ? 'One moment...' : 'Get my photo'}</button>
+          <button className="btn btn-ghost" onClick={onExit} disabled={busy} aria-label={t('edit.exitLabel')}>{t('edit.exit')}</button>
+          <button className="btn btn-ghost" onClick={onRetake} disabled={busy}>{t('edit.retake')}</button>
+          <button className="btn btn-sun big" onClick={finish} disabled={busy}>{busy ? t('edit.busy') : t('edit.finish')}</button>
         </div>
       </aside>
       {drawing && <Doodle colors={edit.colors} onAddColor={addColor} onCancel={() => setDrawing(false)} onDone={addDoodle} />}

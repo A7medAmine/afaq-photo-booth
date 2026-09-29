@@ -3,6 +3,7 @@ import { useCamera } from './camera.js'
 import { fontsReady, preloadAll } from './compose.js'
 import { useCustomStickers } from './customStickers.js'
 import { useIdle } from './useIdle.js'
+import { useI18n } from './i18n.jsx'
 import Attract from './screens/Attract.jsx'
 import Capture from './screens/Capture.jsx'
 import Edit from './screens/Edit.jsx'
@@ -12,6 +13,7 @@ const freshEdit = () => ({ frameId: 'circuit', filterId: 'none', caption: '', st
 
 export default function App() {
   const cam = useCamera()
+  const { t } = useI18n()
   const custom = useCustomStickers()
   const [ready, setReady] = useState(false)
   const [screen, setScreen] = useState('attract')
@@ -43,7 +45,7 @@ export default function App() {
 
   useIdle(screen === 'edit', 120000, reset)
 
-  if (!ready) return <div className="boot">Warming up the booth...</div>
+  if (!ready) return <div className="boot">{t('boot')}</div>
 
   if (screen === 'capture')
     return (
@@ -64,8 +66,12 @@ export default function App() {
         shots={shots}
         edit={edit}
         custom={custom.list}
+        hidden={custom.hidden}
+        groups={custom.groups}
+        assign={custom.assign}
         setEdit={setEdit}
         onRetake={() => setScreen('capture')}
+        onExit={reset}
         onFinish={(blob) => {
           setFinalBlob(blob)
           setScreen('done')

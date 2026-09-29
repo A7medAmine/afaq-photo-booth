@@ -11,6 +11,7 @@
     "fake-phone": "node scripts/fake-phone.mjs"
   },
   "dependencies": {
+    "@fontsource-variable/baloo-bhaijaan-2": "^5.3.0",
     "@fontsource-variable/fredoka": "^5.3.0",
     "qrcode": "^1.5.4",
     "react": "^19.3.0",

@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import QRCode from 'qrcode'
+import { useI18n } from '../i18n.jsx'
 
 const CLOUD = (import.meta.env.VITE_CLOUD_URL || '').replace(/\/$/, '')
 const KEY = import.meta.env.VITE_UPLOAD_KEY || ''
 const RESET_AFTER = 60
 
 export default function Done({ blob, onNext }) {
+  const { t } = useI18n()
   const [status, setStatus] = useState('uploading')
   const [qr, setQr] = useState('')
   const [link, setLink] = useState('')
@@ -48,35 +50,35 @@ export default function Done({ blob, onNext }) {
     <main className="screen done">
       <div className="done-photo">
         <span className="tape" />
-        <img src={preview} alt="Your finished photo" />
+        <img src={preview} alt={t('done.photoAlt')} />
       </div>
 
       <section className="done-info">
         {status === 'uploading' && (
           <>
             <img className="spin-bolt" src="/assets/bolt.webp" alt="" />
-            <h1>Sending your photo</h1>
-            <p>Hang on, this takes a few seconds.</p>
+            <h1>{t('done.sending')}</h1>
+            <p>{t('done.wait')}</p>
           </>
         )}
         {status === 'error' && (
           <>
-            <h1>Could not upload</h1>
-            <p>The booth cannot reach the photo server. Check the internet connection, then try again.</p>
+            <h1>{t('done.errTitle')}</h1>
+            <p>{t('done.errBody')}</p>
             <div className="row">
-              <button className="btn btn-sun big" onClick={upload}>Try again</button>
-              <a className="btn btn-ghost big" href={preview} download="afaq-photo.jpg">Save on this device</a>
+              <button className="btn btn-sun big" onClick={upload}>{t('done.retry')}</button>
+              <a className="btn btn-ghost big" href={preview} download="afaq-photo.jpg">{t('done.save')}</a>
             </div>
           </>
         )}
         {status === 'ready' && (
           <>
-            <h1>Scan to get your photo</h1>
-            <div className="qr"><img src={qr} alt={`QR code to download your photo: ${link}`} /></div>
-            <p>Open your phone camera and point it at the code.</p>
+            <h1>{t('done.scan')}</h1>
+            <div className="qr"><img src={qr} alt={`${t('done.qrAlt')}: ${link}`} /></div>
+            <p>{t('done.scanBody')}</p>
             <div className="row">
-              <button className="btn btn-sun big" onClick={onNext}>Next person</button>
-              <span className="timer">Resets in {left}s</span>
+              <button className="btn btn-sun big" onClick={onNext}>{t('done.next')}</button>
+              <span className="timer">{t('done.resets', { n: left })}</span>
             </div>
           </>
         )}

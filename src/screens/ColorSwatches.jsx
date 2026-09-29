@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import { useI18n } from '../i18n.jsx'
 
 function hsvToHex(h, s, v) {
   const f = (n) => {
@@ -10,6 +11,7 @@ function hsvToHex(h, s, v) {
 }
 
 function Picker({ onCancel, onOk }) {
+  const { t } = useI18n()
   const [h, setH] = useState(330)
   const [s, setS] = useState(0.85)
   const [v, setV] = useState(1)
@@ -43,7 +45,7 @@ function Picker({ onCancel, onOk }) {
           min="0"
           max="359"
           value={h}
-          aria-label="Shade"
+          aria-label={t('color.shade')}
           onChange={(e) => setH(Number(e.target.value))}
         />
         <div className="picker-preview">
@@ -51,31 +53,32 @@ function Picker({ onCancel, onOk }) {
           <span className="picker-hex">{hex}</span>
         </div>
         <div className="picker-actions">
-          <button className="btn btn-ghost" onClick={onCancel}>Cancel</button>
-          <button className="btn btn-sun" onClick={() => onOk(hex)}>OK</button>
+          <button className="btn btn-ghost" onClick={onCancel}>{t('color.cancel')}</button>
+          <button className="btn btn-sun" onClick={() => onOk(hex)}>{t('color.ok')}</button>
         </div>
       </div>
     </div>
   )
 }
 
-export default function ColorSwatches({ base, custom = [], value, onPick, onAdd, label = 'Colour' }) {
+export default function ColorSwatches({ base, custom = [], value, onPick, onAdd, label }) {
+  const { t } = useI18n()
   const [open, setOpen] = useState(false)
 
   return (
-    <div className="swatches" role="radiogroup" aria-label={label}>
+    <div className="swatches" role="radiogroup" aria-label={label || t('color.label')}>
       {[...base, ...custom].map((c) => (
         <button
           key={c}
           role="radio"
           aria-checked={value === c}
-          aria-label={`Colour ${c}`}
+          aria-label={`${label || t('color.label')} ${c}`}
           className={`swatch ${value === c ? 'on' : ''}`}
           style={{ background: c }}
           onClick={() => onPick(c)}
         />
       ))}
-      <button className="swatch plus" aria-label="Add a colour" onClick={() => setOpen(true)}>+</button>
+      <button className="swatch plus" aria-label={t('color.add')} onClick={() => setOpen(true)}>+</button>
       {open && (
         <Picker
           onCancel={() => setOpen(false)}

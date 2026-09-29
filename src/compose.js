@@ -1,3 +1,4 @@
+import { formatDate, translate } from './i18n.jsx'
 import { OPEN_SHAPES, shapePath } from './shapes.js'
 
 export const LAYOUTS = {
@@ -197,33 +198,33 @@ export const FRAMES = [
   },
 ]
 
+const club = (o) => ({ kind: 'img', group: 'club', ...o })
+const EMOJI_GROUPS = {
+  faces: ['1f916', '1f60e', '1f47e'],
+  fun: ['1f389', '1f3ae', '2b50', '2764-fe0f'],
+  tech: ['26a1', '1f680', '1f527', '1f4a1', '1f525'],
+}
+
 export const STICKERS = [
-  { id: 'robocar', kind: 'img', src: '/assets/robocar-removed-bg.webp', size: 0.49 },
-  { id: 'uno', kind: 'img', src: '/assets/uno.webp', size: 0.44 },
-  { id: 'pi', kind: 'img', src: '/assets/pi-removed-bg.webp', size: 0.42 },
-  { id: 'esp32', kind: 'img', src: '/assets/esp32-removed-bg.webp', size: 0.39 },
-  { id: 'led', kind: 'img', src: '/assets/led-removed-bg.webp', size: 0.26 },
-  { id: 'bolt', kind: 'img', src: '/assets/bolt.webp', size: 0.29 },
-  { id: 'screwdriver', kind: 'img', src: '/assets/screwdriver.webp', size: 0.44 },
-  { id: 'bord', kind: 'img', src: '/assets/bord.webp', size: 0.44 },
-  { id: 'logo', kind: 'img', src: '/assets/main.webp', size: 0.29, round: true },
-  ...['1f916', '26a1', '1f680', '1f527', '1f4a1', '1f389', '1f60e', '2b50', '2764-fe0f', '1f525', '1f47e', '1f3ae'].map((c) => ({
-    id: `e-${c}`,
-    kind: 'img',
-    src: `/assets/emoji/${c}.png`,
-    size: 0.2,
-  })),
+  club({ id: 'robocar', src: '/assets/robocar-removed-bg.webp', size: 0.49 }),
+  club({ id: 'uno', src: '/assets/uno.webp', size: 0.44 }),
+  club({ id: 'pi', src: '/assets/pi-removed-bg.webp', size: 0.42 }),
+  club({ id: 'esp32', src: '/assets/esp32-removed-bg.webp', size: 0.39 }),
+  club({ id: 'led', src: '/assets/led-removed-bg.webp', size: 0.26 }),
+  club({ id: 'bolt', src: '/assets/bolt.webp', size: 0.29 }),
+  club({ id: 'screwdriver', src: '/assets/screwdriver.webp', size: 0.44 }),
+  club({ id: 'bord', src: '/assets/bord.webp', size: 0.44 }),
+  club({ id: 'logo', src: '/assets/main.webp', size: 0.29, round: true }),
+  ...Object.entries(EMOJI_GROUPS).flatMap(([group, codes]) =>
+    codes.map((c) => ({ id: `e-${c}`, kind: 'img', group, src: `/assets/emoji/${c}.png`, size: 0.2 })),
+  ),
 ]
 
-export const BUBBLES = [
-  { text: 'AFAQ!', color: '#ffd23f' },
-  { text: 'BEEP BOOP', color: '#2ee6a6' },
-  { text: 'LEVEL UP', color: '#ff5fa2' },
-  { text: 'POWER ON', color: '#3ca2fa' },
-  { text: '404 SMILE NOT FOUND', color: '#ffffff' },
-  { text: 'SHORT CIRCUIT', color: '#ffd23f' },
-  { text: 'MAKER MODE', color: '#ff5fa2' },
-]
+export const BUBBLE_COLORS = ['#ffd23f', '#2ee6a6', '#ff5fa2', '#3ca2fa', '#ffffff', '#ffd23f', '#ff5fa2']
+
+const FONT_STACK = '"Minecraft", "Fredoka Variable", "Baloo Bhaijaan 2 Variable", sans-serif'
+const UI_STACK = '"Fredoka Variable", "Baloo Bhaijaan 2 Variable", sans-serif'
+const hasArabic = (t) => /[؀-ۿ]/.test(t)
 
 const imageCache = new Map()
 export function loadImage(src) {
@@ -259,6 +260,7 @@ export function fontsReady() {
   return Promise.all([
     document.fonts.load('40px "Minecraft"'),
     document.fonts.load('600 40px "Fredoka Variable"'),
+    document.fonts.load('600 40px "Baloo Bhaijaan 2 Variable"', 'آفاق ابتسم'),
   ]).catch(() => {})
 }
 
@@ -274,7 +276,8 @@ export function stickerBox(ctx, s, W) {
     return { w, h: w }
   }
   const fs = s.size * W * 0.34
-  ctx.font = `${fs}px "Minecraft", "Fredoka Variable", sans-serif`
+  ctx.font = `${fs}px ${FONT_STACK}`
+  ctx.direction = hasArabic(s.text) ? 'rtl' : 'ltr'
   const tw = ctx.measureText(s.text).width
   return { w: tw + fs, h: fs * 1.9, fs }
 }
@@ -337,7 +340,8 @@ function drawSticker(ctx, s, W, H) {
     ctx.strokeStyle = INK
     ctx.stroke()
     ctx.fillStyle = INK
-    ctx.font = `${box.fs}px "Minecraft", "Fredoka Variable", sans-serif`
+    ctx.font = `${box.fs}px ${FONT_STACK}`
+    ctx.direction = hasArabic(s.text) ? 'rtl' : 'ltr'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
     ctx.fillText(s.text, 0, box.fs * 0.06)
@@ -457,9 +461,10 @@ function drawSelection(ctx, s, W, H, hr) {
   })
 }
 
-function drawFooter(ctx, layout, frame, caption) {
+function drawFooter(ctx, layout, frame, caption, lang = 'en') {
   const { W } = layout
   const { y, h } = layout.footer
+  const rtl = lang === 'ar'
   const k = Math.min(W / 1200, h / 300)
   const logo = 200 * k
   const title = 92 * k
@@ -467,8 +472,10 @@ function drawFooter(ctx, layout, frame, caption) {
   const line = 50 * k
   const gap = 36 * k
   const cy = y + h / 2
-  const textLeft = W / 2 - (logo + gap + 560 * k) / 2 + logo + gap
-  const left = textLeft - logo - gap
+  const textW = 560 * k
+  const x0 = W / 2 - (logo + gap + textW) / 2
+  const left = rtl ? x0 + textW + gap : x0
+  const textX = rtl ? x0 + textW : x0 + logo + gap
 
   const img = loadImage('/assets/main.webp')
   ctx.save()
@@ -486,15 +493,17 @@ function drawFooter(ctx, layout, frame, caption) {
     ctx.stroke()
   }
   ctx.fillStyle = frame.ink
-  ctx.textAlign = 'left'
+  ctx.textAlign = rtl ? 'right' : 'left'
+  ctx.direction = rtl ? 'rtl' : 'ltr'
   ctx.textBaseline = 'alphabetic'
   ctx.font = `${title}px "Minecraft"`
-  ctx.fillText('AFAQ', textLeft, cy - 6 * k)
-  ctx.font = `${sub}px "Minecraft"`
-  ctx.fillText('Scientific Club', textLeft, cy + sub + 2 * k)
-  ctx.font = `600 ${line}px "Fredoka Variable", sans-serif`
-  const date = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
-  ctx.fillText(caption || `Opening Day · ${date}`, textLeft, cy + sub + line + 14 * k, 600 * k)
+  ctx.fillText('AFAQ', textX, cy - 6 * k)
+  ctx.font = rtl ? `700 ${sub * 1.15}px "Baloo Bhaijaan 2 Variable", sans-serif` : `${sub}px ${FONT_STACK}`
+  ctx.fillText(translate(lang, 'footer.sub'), textX, cy + sub + (rtl ? 0 : 2) * k)
+  ctx.font = `600 ${line}px ${UI_STACK}`
+  const text = caption || translate(lang, 'footer.caption', { date: formatDate(lang) })
+  ctx.direction = hasArabic(text) ? 'rtl' : ctx.direction
+  ctx.fillText(text, textX, cy + sub + line + (rtl ? 26 : 14) * k, textW)
   ctx.restore()
 }
 
@@ -532,7 +541,7 @@ export function renderComposite(canvas, state, opts = {}) {
     ctx.restore()
   })
 
-  if (withFooter) drawFooter(ctx, layout, frame, state.caption)
+  if (withFooter) drawFooter(ctx, layout, frame, state.caption, state.lang)
 
   if (withStickers) {
     state.stickers.forEach((s) => drawSticker(ctx, s, W, H))
