@@ -1,0 +1,24 @@
+{
+  "name": "afaq-photo-booth",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently -k -n booth,cloud -c blue,magenta \"vite\" \"npm --prefix cloud start\"",
+    "booth": "vite",
+    "cloud": "npm --prefix cloud start",
+    "build": "vite build",
+    "fake-phone": "node scripts/fake-phone.mjs"
+  },
+  "dependencies": {
+    "@fontsource-variable/fredoka": "^5.3.0",
+    "qrcode": "^1.5.4",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^6.1.1",
+    "concurrently": "^10.0.5",
+    "vite": "^8.3.1"
+  }
+}
