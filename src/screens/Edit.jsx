@@ -72,7 +72,7 @@ export default function Edit({ custom = [], hidden = [], groups: allGroups = [],
   }
 
   useEffect(() => {
-    renderComposite(canvasRef.current, state, { scale: 0.6, selectedId, handleR: handleR() })
+    renderComposite(canvasRef.current, state, { scale: 0.9, selectedId, handleR: handleR() })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state, selectedId, tick])
 
