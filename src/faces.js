@@ -53,7 +53,8 @@ export const FACE_STICKERS = [
   { id: 'f-clown', anchor: 'nose', src: clownNose, width: 0.2 },
 ]
 
-const MAX_FACES = 6
+const MAX_FACES = 12
+const TILE_SCALES = [0.6, 0.36]
 const cache = new WeakMap()
 let landmarker = null
 
@@ -63,6 +64,8 @@ function getLandmarker() {
       baseOptions: { modelAssetPath: '/mediapipe/face_landmarker.task' },
       runningMode: 'IMAGE',
       numFaces: MAX_FACES,
+      minFaceDetectionConfidence: 0.35,
+      minFacePresenceConfidence: 0.35,
     }),
   )
   return landmarker
@@ -76,8 +79,8 @@ export function warmUpFaces() {
 const mid = (a, b) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 })
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y)
 
-function toFace(lm, w, h) {
-  const p = (i) => ({ x: lm[i].x * w, y: lm[i].y * h })
+function toFace(lm, w, h, ox = 0, oy = 0) {
+  const p = (i) => ({ x: lm[i].x * w + ox, y: lm[i].y * h + oy })
   const left = p(33)
   const right = p(263)
   return {
@@ -85,19 +88,59 @@ function toFace(lm, w, h) {
     eyes: mid(left, right),
     eyeSpan: dist(left, right),
     forehead: p(10),
+    chin: p(152),
     nose: p(1),
     cheeks: [p(50), p(280)],
     width: dist(p(234), p(454)),
   }
 }
 
+// MediaPipe shrinks its input, so faces in a wide group shot end up a few pixels
+// wide. Scan overlapping crops as well as the whole image, then merge the results.
+function tiles(w, h) {
+  return TILE_SCALES.flatMap((scale) => {
+    const size = Math.round(Math.min(w, h) * scale)
+    const stride = Math.round(size / 2)
+    const axis = (len) => {
+      const out = []
+      for (let at = 0; at + size < len; at += stride) out.push(at)
+      out.push(len - size)
+      return out
+    }
+    return axis(h).flatMap((y) => axis(w).map((x) => ({ x, y, size })))
+  })
+}
+
+function dedupe(found) {
+  const kept = []
+  found.sort((a, b) => a.off - b.off).forEach((f) => {
+    const dup = kept.some((k) => Math.hypot(k.eyes.x - f.eyes.x, k.eyes.y - f.eyes.y) < Math.min(k.width, f.width) * 0.6)
+    if (!dup) kept.push(f)
+  })
+  return kept
+}
+
 export async function detectFaces(shot) {
   if (cache.has(shot)) return cache.get(shot)
   const lm = await getLandmarker()
-  const res = lm.detect(shot)
-  const faces = res.faceLandmarks
-    .map((f) => toFace(f, shot.width, shot.height))
+  const found = []
+  const collect = (res, w, h, ox, oy, cx, cy) =>
+    res.faceLandmarks.forEach((f) => {
+      const face = toFace(f, w, h, ox, oy)
+      // Faces cut by a crop edge have poor landmarks, so prefer the crop where the face sits most centrally.
+      found.push({ ...face, off: Math.hypot(face.eyes.x - (ox + cx), face.eyes.y - (oy + cy)) / w })
+    })
+  collect(lm.detect(shot), shot.width, shot.height, 0, 0, shot.width / 2, shot.height / 2)
+  const crop = document.createElement('canvas')
+  for (const t of tiles(shot.width, shot.height)) {
+    crop.width = crop.height = t.size
+    crop.getContext('2d').drawImage(shot, t.x, t.y, t.size, t.size, 0, 0, t.size, t.size)
+    collect(lm.detect(crop), t.size, t.size, t.x, t.y, t.size / 2, t.size / 2)
+  }
+  const faces = dedupe(found)
+    .filter((f) => f.width > 0)
     .sort((a, b) => a.eyes.x - b.eyes.x)
+    .slice(0, MAX_FACES)
   cache.set(shot, faces)
   return faces
 }

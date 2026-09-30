@@ -19,7 +19,7 @@ import ColorSwatches from './ColorSwatches.jsx'
 import ToolIcon from './ToolIcon.jsx'
 import BrushSize from './BrushSize.jsx'
 import { groupOf } from '../customStickers.js'
-import { detectFaces, FACE_STICKERS, PARTS, placeOnFace } from '../faces.js'
+import { detectFaces, FACE_STICKERS, PARTS, placeOnFace, shotToLayout } from '../faces.js'
 import { OPEN_SHAPES, SHAPES } from '../shapes.js'
 import { BUBBLE_TEXT, useI18n } from '../i18n.jsx'
 
@@ -57,7 +57,9 @@ export default function Edit({ custom = [], faceCustom = [], hidden = [], groups
   const [shape, setShape] = useState('circle')
   const [filled, setFilled] = useState(true)
   const [faces, setFaces] = useState(null)
+  const [who, setWho] = useState(null)
   const canvasRef = useRef(null)
+  const stageRef = useRef(null)
   const drag = useRef(null)
   const L = useMemo(() => getLayout(layout, shots), [layout, shots])
 
@@ -83,7 +85,7 @@ export default function Edit({ custom = [], faceCustom = [], hidden = [], groups
   useEffect(() => {
     let live = true
     Promise.all(L.slots.map((_, i) => detectFaces(shots[i])))
-      .then((f) => live && setFaces(f))
+      .then((f) => live && (setFaces(f), setWho(null)))
       .catch(() => live && setFaces([]))
     return () => { live = false }
   }, [L, shots])
@@ -95,6 +97,9 @@ export default function Edit({ custom = [], faceCustom = [], hidden = [], groups
   }
 
   // Face stickers follow the photo when it is zoomed or panned, until the user moves them by hand.
+  // The latest items and placer are read through a ref so this only runs when the photo or faces change.
+  const latest = useRef({})
+  latest.current = { faceItems, placeFace }
   useEffect(() => {
     if (!faces) return
     const photo = edit.photo || DEFAULT_PHOTO
@@ -104,13 +109,13 @@ export default function Edit({ custom = [], faceCustom = [], hidden = [], groups
         ...e,
         stickers: e.stickers.map((s) => {
           const f = s.face
-          const item = f && faceItems.find((i) => i.id === f.item)
-          return item && faces[f.shot]?.[f.idx] ? { ...s, ...placeFace(item, f.shot, f.idx, photo, f.part) } : s
+          const item = f && latest.current.faceItems.find((i) => i.id === f.item)
+          return item && faces[f.shot]?.[f.idx] ? { ...s, ...latest.current.placeFace(item, f.shot, f.idx, photo, f.part) } : s
         }),
       }
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [edit.photo, faces, faceItems])
+  }, [edit.photo, faces, setEdit])
 
   const patchEdit = (p) => setEdit((e) => ({ ...e, ...p }))
   const patchSticker = (id, fn) =>
@@ -272,34 +277,53 @@ export default function Edit({ custom = [], faceCustom = [], hidden = [], groups
     addSticker(base)
   }
 
-  const faceCount = faces ? faces.reduce((n, f) => n + f.length, 0) : 0
-  const onFace = (item) => edit.stickers.filter((s) => s.face?.item === item.id).length
+  // Face stickers go to one chosen person, or to everyone when nobody is chosen.
+  const faceKey = (shot, idx) => `${shot}:${idx}`
+  const everyone = faces ? faces.flatMap((list, shot) => list.map((_, idx) => ({ shot, idx, key: faceKey(shot, idx) }))) : []
+  const faceCount = everyone.length
+  const targets = who ? everyone.filter((f) => f.key === who) : everyone
+  const inTarget = (s) => s.face && (!who || faceKey(s.face.shot, s.face.idx) === who)
+  const onFace = (item) => edit.stickers.filter((s) => inTarget(s) && s.face.item === item.id).length
   const toggleFace = (item) => {
     const photo = edit.photo || DEFAULT_PHOTO
     const parts = PARTS[item.anchor] || 1
-    const added = onFace(item) === faceCount * parts
+    const added = onFace(item) === targets.length * parts
     const fresh = added
       ? []
-      : faces.flatMap((list, shot) =>
-          list.flatMap((_, idx) =>
-            Array.from({ length: parts }, (_, part) => ({
-              kind: 'img',
-              src: item.src,
-              flat: item.flat,
-              id: uid(),
-              rot: 0,
-              face: { shot, idx, item: item.id, part },
-              ...placeFace(item, shot, idx, photo, part),
-            })),
-          ),
+      : targets.flatMap(({ shot, idx }) =>
+          Array.from({ length: parts }, (_, part) => ({
+            kind: 'img',
+            src: item.src,
+            flat: item.flat,
+            id: uid(),
+            rot: 0,
+            face: { shot, idx, item: item.id, part },
+            ...placeFace(item, shot, idx, photo, part),
+          })),
         )
     setEdit((e) => ({
       ...e,
-      stickers: [...e.stickers.filter((s) => !(s.face && (added || faceItems.find((i) => i.id === s.face.item)?.anchor === item.anchor))), ...fresh],
+      stickers: [...e.stickers.filter((s) => !(inTarget(s) && (added ? s.face.item === item.id : faceItems.find((i) => i.id === s.face.item)?.anchor === item.anchor))), ...fresh],
     }))
     setSelectedId(null)
   }
-  const clearFaces = () => setEdit((e) => ({ ...e, stickers: e.stickers.filter((s) => !s.face) }))
+  const clearFaces = () => setEdit((e) => ({ ...e, stickers: e.stickers.filter((s) => !inTarget(s)) }))
+
+  // Numbered badges sit under each face on the photo so one person can be picked by tapping.
+  const badges = []
+  const cv = canvasRef.current
+  const stage = stageRef.current
+  if (tab === 'Face' && faces && cv && stage) {
+    const r = cv.getBoundingClientRect()
+    const sr = stage.getBoundingClientRect()
+    const k = r.width / L.W
+    const photo = edit.photo || DEFAULT_PHOTO
+    everyone.forEach((f, n) => {
+      const face = faces[f.shot][f.idx]
+      const c = shotToLayout(shots[f.shot], L.slots[f.shot], photo, { x: (face.eyes.x + face.chin.x) / 2, y: (face.eyes.y + face.chin.y) / 2 })
+      badges.push({ ...f, n: n + 1, x: r.left - sr.left + c.x * k, y: r.top - sr.top + c.y * k, d: face.width * c.k * k * 1.5 })
+    })
+  }
 
   const finish = async () => {
     setBusy(true)
@@ -309,7 +333,7 @@ export default function Edit({ custom = [], faceCustom = [], hidden = [], groups
 
   return (
     <main className="screen edit">
-      <section className="stage">
+      <section className="stage" ref={stageRef}>
         <canvas
           ref={canvasRef}
           className={`edit-canvas ${tab === 'Draw' ? 'drawing' : ''} `}
@@ -322,6 +346,12 @@ export default function Edit({ custom = [], faceCustom = [], hidden = [], groups
           onDrop={onDropSticker}
           aria-label={t('edit.canvas')}
         />
+        {badges.map((b) => (
+          <div key={b.key} className="face-pick" style={{ left: b.x, top: b.y, width: b.d, height: b.d }}>
+            {who === b.key && <span className="face-ring" />}
+            <button className={`face-badge ${who === b.key ? 'on' : ''}`} aria-pressed={who === b.key} aria-label={t('face.person', { n: b.n })} onClick={() => setWho(who === b.key ? null : b.key)}>{b.n}</button>
+          </div>
+        ))}
         <div className={`sticker-bar ${selected ? 'on' : ''}`} role="toolbar" aria-label={t('edit.selected')}>
           <button className="tool" aria-label={t('edit.smaller')} onClick={() => tweak((s) => ({ size: clamp(s.size * 0.88, 0.08, 0.9) }))}>−</button>
           <button className="tool" aria-label={t('edit.bigger')} onClick={() => tweak((s) => ({ size: clamp(s.size * 1.14, 0.08, 0.9) }))}>+</button>
@@ -392,14 +422,21 @@ export default function Edit({ custom = [], faceCustom = [], hidden = [], groups
             <div className="face-tab">
               <p className="hint">{t('face.hint')}</p>
               <p className="note" role="status">{!faces ? t('face.looking') : faceCount ? t('face.found', { n: faceCount }) : t('face.none')}</p>
+              {faceCount > 1 && (
+                <div className="chips" role="radiogroup" aria-label={t('face.apply')}>
+                  {[{ key: null, label: t('face.everyone') }, ...everyone.map((f, n) => ({ key: f.key, label: String(n + 1) }))].map((c) => (
+                    <button key={c.key ?? 'all'} role="radio" aria-checked={who === c.key} className={`chip ${who === c.key ? 'on' : ''}`} onClick={() => setWho(c.key)}>{c.label}</button>
+                  ))}
+                </div>
+              )}
               <div className="grid stickers">
                 {faceItems.map((item) => (
-                  <button key={item.id} className={`opt sticker ${faceCount && onFace(item) === faceCount * (PARTS[item.anchor] || 1) ? 'on' : ''}`} disabled={!faceCount} onClick={() => toggleFace(item)}>
+                  <button key={item.id} className={`opt sticker ${targets.length && onFace(item) === targets.length * (PARTS[item.anchor] || 1) ? 'on' : ''}`} disabled={!targets.length} onClick={() => toggleFace(item)}>
                     <img src={item.src} alt="" />
                   </button>
                 ))}
               </div>
-              <button className="btn btn-ghost" disabled={!edit.stickers.some((s) => s.face)} onClick={clearFaces}>{t('face.clear')}</button>
+              <button className="btn btn-ghost" disabled={!edit.stickers.some(inTarget)} onClick={clearFaces}>{t('face.clear')}</button>
             </div>
           )}
 
