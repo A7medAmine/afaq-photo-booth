@@ -40,7 +40,7 @@ async function toSticker(rec) {
   return { id: rec.id, kind: 'img', src, size: 0.4, custom: true, ...(rec.anchor && { anchor: rec.anchor, width: FACE_WIDTH[rec.anchor] }) }
 }
 
-const FACE_WIDTH = { top: 1.05, eyes: 1.45 }
+const FACE_WIDTH = { top: 1.05, eyes: 1.45, cheeks: 0.3, nose: 0.2, freckles: 0.8 }
 const HIDDEN_KEY = 'afaq-hidden-stickers'
 const GROUPS_KEY = 'afaq-sticker-groups'
 

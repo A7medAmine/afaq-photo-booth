@@ -19,7 +19,7 @@ import ColorSwatches from './ColorSwatches.jsx'
 import ToolIcon from './ToolIcon.jsx'
 import BrushSize from './BrushSize.jsx'
 import { groupOf } from '../customStickers.js'
-import { detectFaces, FACE_STICKERS, placeOnFace } from '../faces.js'
+import { detectFaces, FACE_STICKERS, PARTS, placeOnFace } from '../faces.js'
 import { OPEN_SHAPES, SHAPES } from '../shapes.js'
 import { BUBBLE_TEXT, useI18n } from '../i18n.jsx'
 
@@ -89,9 +89,9 @@ export default function Edit({ custom = [], faceCustom = [], hidden = [], groups
   }, [L, shots])
 
   const faceItems = useMemo(() => [...FACE_STICKERS.filter((s) => !hidden.includes(s.id)), ...faceCustom], [hidden, faceCustom])
-  const placeFace = (item, shot, idx, photo) => {
+  const placeFace = (item, shot, idx, photo, part = 0) => {
     const img = loadImage(item.src)
-    return placeOnFace(item, faces[shot][idx], shots[shot], L.slots[shot], photo, L, img ? img.naturalHeight / img.naturalWidth : 1)
+    return placeOnFace(item, faces[shot][idx], shots[shot], L.slots[shot], photo, L, img ? img.naturalHeight / img.naturalWidth : 1, part)
   }
 
   // Face stickers follow the photo when it is zoomed or panned, until the user moves them by hand.
@@ -105,7 +105,7 @@ export default function Edit({ custom = [], faceCustom = [], hidden = [], groups
         stickers: e.stickers.map((s) => {
           const f = s.face
           const item = f && faceItems.find((i) => i.id === f.item)
-          return item && faces[f.shot]?.[f.idx] ? { ...s, ...placeFace(item, f.shot, f.idx, photo) } : s
+          return item && faces[f.shot]?.[f.idx] ? { ...s, ...placeFace(item, f.shot, f.idx, photo, f.part) } : s
         }),
       }
     })
@@ -276,18 +276,22 @@ export default function Edit({ custom = [], faceCustom = [], hidden = [], groups
   const onFace = (item) => edit.stickers.filter((s) => s.face?.item === item.id).length
   const toggleFace = (item) => {
     const photo = edit.photo || DEFAULT_PHOTO
-    const added = onFace(item) === faceCount
+    const parts = PARTS[item.anchor] || 1
+    const added = onFace(item) === faceCount * parts
     const fresh = added
       ? []
       : faces.flatMap((list, shot) =>
-          list.map((_, idx) => ({
-            kind: 'img',
-            src: item.src,
-            id: uid(),
-            rot: 0,
-            face: { shot, idx, item: item.id },
-            ...placeFace(item, shot, idx, photo),
-          })),
+          list.flatMap((_, idx) =>
+            Array.from({ length: parts }, (_, part) => ({
+              kind: 'img',
+              src: item.src,
+              flat: item.flat,
+              id: uid(),
+              rot: 0,
+              face: { shot, idx, item: item.id, part },
+              ...placeFace(item, shot, idx, photo, part),
+            })),
+          ),
         )
     setEdit((e) => ({
       ...e,
@@ -390,7 +394,7 @@ export default function Edit({ custom = [], faceCustom = [], hidden = [], groups
               <p className="note" role="status">{!faces ? t('face.looking') : faceCount ? t('face.found', { n: faceCount }) : t('face.none')}</p>
               <div className="grid stickers">
                 {faceItems.map((item) => (
-                  <button key={item.id} className={`opt sticker ${faceCount && onFace(item) === faceCount ? 'on' : ''}`} disabled={!faceCount} onClick={() => toggleFace(item)}>
+                  <button key={item.id} className={`opt sticker ${faceCount && onFace(item) === faceCount * (PARTS[item.anchor] || 1) ? 'on' : ''}`} disabled={!faceCount} onClick={() => toggleFace(item)}>
                     <img src={item.src} alt="" />
                   </button>
                 ))}

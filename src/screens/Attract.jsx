@@ -237,7 +237,7 @@ function Settings({ cam, custom, onClose, onTestFiles }) {
         <div className="field">
           Face stickers
           <span className="note">These land on faces by themselves. Use a transparent PNG cropped tight around the hat or glasses, facing the camera. Tap a built-in one to hide or show it.</span>
-          {[['top', 'On the head (hats, crowns)'], ['eyes', 'On the eyes (glasses)']].map(([anchor, title]) => (
+          {[['top', 'On the head (hats, crowns)'], ['eyes', 'On the eyes (glasses)'], ['cheeks', 'On the cheeks (blush, hearts; one per cheek)'], ['nose', 'On the nose'], ['freckles', 'Across nose and cheeks (freckles)']].map(([anchor, title]) => (
             <div className="folder" key={anchor}>
               <div className="folder-head">
                 <strong>{title}</strong>

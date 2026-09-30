@@ -305,9 +305,9 @@ function drawSticker(ctx, s, W, H) {
   ctx.save()
   ctx.translate(s.x * W, s.y * H)
   ctx.rotate(s.rot)
-  ctx.shadowColor = 'rgba(3,10,46,.35)'
-  ctx.shadowBlur = 14
-  ctx.shadowOffsetY = 8
+  if (!s.flat) ctx.shadowColor = 'rgba(3,10,46,.35)'
+  if (!s.flat) ctx.shadowBlur = 14
+  if (!s.flat) ctx.shadowOffsetY = 8
   if (s.kind === 'img') {
     const img = loadImage(s.src)
     if (img) {
