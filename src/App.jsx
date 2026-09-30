@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useCamera } from './camera.js'
 import { fontsReady, preloadAll } from './compose.js'
+import { warmUpFaces } from './faces.js'
 import { useCustomStickers } from './customStickers.js'
 import { useIdle } from './useIdle.js'
 import { useI18n } from './i18n.jsx'
@@ -33,6 +34,7 @@ export default function App() {
   }, [])
 
   useEffect(() => {
+    warmUpFaces()
     Promise.all([fontsReady(), preloadAll()]).finally(() => setReady(true))
   }, [])
 

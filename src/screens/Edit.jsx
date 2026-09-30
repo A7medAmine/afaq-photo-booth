@@ -18,10 +18,11 @@ import ColorSwatches from './ColorSwatches.jsx'
 import ToolIcon from './ToolIcon.jsx'
 import BrushSize from './BrushSize.jsx'
 import { groupOf } from '../customStickers.js'
+import { detectFaces, FACE_STICKERS, placeOnFace } from '../faces.js'
 import { OPEN_SHAPES, SHAPES } from '../shapes.js'
 import { BUBBLE_TEXT, useI18n } from '../i18n.jsx'
 
-const TABS = [['Frames', 'edit.frames'], ['Filters', 'edit.filters'], ['Stickers', 'edit.stickers'], ['Draw', 'edit.draw'], ['Text', 'edit.text'], ['Photo', 'edit.photo']]
+const TABS = [['Frames', 'edit.frames'], ['Filters', 'edit.filters'], ['Stickers', 'edit.stickers'], ['Face', 'edit.face'], ['Draw', 'edit.draw'], ['Text', 'edit.text'], ['Photo', 'edit.photo']]
 const DEFAULT_GROUP_NAMES = { mine: 'Mine', club: 'Club', faces: 'Faces', fun: 'Fun', tech: 'Tech' }
 const INK_COLORS = ['#030a2e', '#ffffff', '#ff5fa2', '#ffd23f', '#2ee6a6', '#3ca2fa', '#2460e7', '#ff8a3d']
 const INK_SIZES = [8, 18, 36]
@@ -53,6 +54,7 @@ export default function Edit({ custom = [], hidden = [], groups: allGroups = [],
   const [drawTool, setDrawTool] = useState('pen')
   const [shape, setShape] = useState('circle')
   const [filled, setFilled] = useState(true)
+  const [faces, setFaces] = useState(null)
   const canvasRef = useRef(null)
   const drag = useRef(null)
   const L = useMemo(() => getLayout(layout, shots), [layout, shots])
@@ -76,9 +78,37 @@ export default function Edit({ custom = [], hidden = [], groups: allGroups = [],
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state, selectedId, tick])
 
+  useEffect(() => {
+    let live = true
+    Promise.all(L.slots.map((_, i) => detectFaces(shots[i])))
+      .then((f) => live && setFaces(f))
+      .catch(() => live && setFaces([]))
+    return () => { live = false }
+  }, [L, shots])
+
+  const placeFace = (item, shot, idx, photo) => placeOnFace(item, faces[shot][idx], shots[shot], L.slots[shot], photo, L)
+
+  // Face stickers follow the photo when it is zoomed or panned, until the user moves them by hand.
+  useEffect(() => {
+    if (!faces) return
+    const photo = edit.photo || DEFAULT_PHOTO
+    setEdit((e) => {
+      if (!e.stickers.some((s) => s.face)) return e
+      return {
+        ...e,
+        stickers: e.stickers.map((s) => {
+          const f = s.face
+          const item = f && FACE_STICKERS.find((i) => i.id === f.item)
+          return item && faces[f.shot]?.[f.idx] ? { ...s, ...placeFace(item, f.shot, f.idx, photo) } : s
+        }),
+      }
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [edit.photo, faces])
+
   const patchEdit = (p) => setEdit((e) => ({ ...e, ...p }))
   const patchSticker = (id, fn) =>
-    setEdit((e) => ({ ...e, stickers: e.stickers.map((s) => (s.id === id ? { ...s, ...fn(s) } : s)) }))
+    setEdit((e) => ({ ...e, stickers: e.stickers.map((s) => (s.id === id ? { ...s, ...fn(s), face: undefined } : s)) }))
 
   const addSticker = (base, pos) => {
     const s = {
@@ -255,6 +285,31 @@ export default function Edit({ custom = [], hidden = [], groups: allGroups = [],
     addSticker(base)
   }
 
+  const faceCount = faces ? faces.reduce((n, f) => n + f.length, 0) : 0
+  const onFace = (item) => edit.stickers.filter((s) => s.face?.item === item.id).length
+  const toggleFace = (item) => {
+    const photo = edit.photo || DEFAULT_PHOTO
+    const added = onFace(item) === faceCount
+    const fresh = added
+      ? []
+      : faces.flatMap((list, shot) =>
+          list.map((_, idx) => ({
+            kind: 'img',
+            src: item.src,
+            id: uid(),
+            rot: 0,
+            face: { shot, idx, item: item.id },
+            ...placeFace(item, shot, idx, photo),
+          })),
+        )
+    setEdit((e) => ({
+      ...e,
+      stickers: [...e.stickers.filter((s) => !(s.face && (added || FACE_STICKERS.find((i) => i.id === s.face.item)?.anchor === item.anchor))), ...fresh],
+    }))
+    setSelectedId(null)
+  }
+  const clearFaces = () => setEdit((e) => ({ ...e, stickers: e.stickers.filter((s) => !s.face) }))
+
   const finish = async () => {
     setBusy(true)
     setSelectedId(null)
@@ -339,6 +394,21 @@ export default function Edit({ custom = [], hidden = [], groups: allGroups = [],
                   {s.kind === 'img' ? <img src={s.src} alt="" /> : <span className="emoji">{s.value}</span>}
                 </button>
               ))}
+            </div>
+          )}
+
+          {tab === 'Face' && (
+            <div className="face-tab">
+              <p className="hint">{t('face.hint')}</p>
+              <p className="note" role="status">{!faces ? t('face.looking') : faceCount ? t('face.found', { n: faceCount }) : t('face.none')}</p>
+              <div className="grid stickers">
+                {FACE_STICKERS.map((item) => (
+                  <button key={item.id} className={`opt sticker ${faceCount && onFace(item) === faceCount ? 'on' : ''}`} disabled={!faceCount} onClick={() => toggleFace(item)}>
+                    <img src={item.src} alt="" />
+                  </button>
+                ))}
+              </div>
+              <button className="btn btn-ghost" disabled={!edit.stickers.some((s) => s.face)} onClick={clearFaces}>{t('face.clear')}</button>
             </div>
           )}
 
