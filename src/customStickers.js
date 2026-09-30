@@ -37,9 +37,10 @@ async function shrink(file) {
 async function toSticker(rec) {
   const src = URL.createObjectURL(rec.blob)
   await whenLoaded(src).catch(() => {})
-  return { id: rec.id, kind: 'img', src, size: 0.4, custom: true }
+  return { id: rec.id, kind: 'img', src, size: 0.4, custom: true, ...(rec.anchor && { anchor: rec.anchor, width: FACE_WIDTH[rec.anchor] }) }
 }
 
+const FACE_WIDTH = { top: 1.05, eyes: 1.45 }
 const HIDDEN_KEY = 'afaq-hidden-stickers'
 const GROUPS_KEY = 'afaq-sticker-groups'
 
@@ -79,7 +80,7 @@ function loadGroups() {
 }
 
 export function useCustomStickers() {
-  const [list, setList] = useState([])
+  const [all, setAll] = useState([])
   const [grp, setGrp] = useState(loadGroups)
   const [hidden, setHidden] = useState(loadHidden)
 
@@ -127,33 +128,33 @@ export function useCustomStickers() {
     let dead = false
     tx('readonly', (s) => s.getAll())
       .then((recs) => Promise.all(recs.sort((a, b) => a.added - b.added).map(toSticker)))
-      .then((l) => !dead && setList(l))
+      .then((l) => !dead && setAll(l))
       .catch(() => {})
     return () => {
       dead = true
     }
   }, [])
 
-  const add = useCallback(async (files, groupId) => {
+  const add = useCallback(async (files, groupId, anchor) => {
     const made = []
     for (const f of files) {
       if (!f.type.startsWith('image/')) continue
-      const rec = { id: `c-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`, blob: await shrink(f), added: Date.now() }
+      const rec = { id: `c-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`, blob: await shrink(f), added: Date.now(), ...(anchor && { anchor }) }
       await tx('readwrite', (s) => s.put(rec))
       made.push(await toSticker(rec))
     }
-    setList((l) => [...l, ...made])
+    setAll((l) => [...l, ...made])
     if (groupId && made.length)
       updateGroups((g) => ({ ...g, assign: { ...g.assign, ...Object.fromEntries(made.map((m) => [m.id, groupId])) } }))
   }, [updateGroups])
 
   const remove = useCallback(async (id) => {
     await tx('readwrite', (s) => s.delete(id))
-    setList((l) => l.filter((s) => s.id !== id))
+    setAll((l) => l.filter((s) => s.id !== id))
   }, [])
 
   return {
-    list, add, remove, hidden, toggleBuiltin, setAllBuiltin,
+    list: all.filter((s) => !s.anchor), faceList: all.filter((s) => s.anchor), add, remove, hidden, toggleBuiltin, setAllBuiltin,
     groups: grp.groups, assign: grp.assign, addGroup, renameGroup, deleteGroup, assignGroup,
   }
 }

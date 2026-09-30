@@ -596,6 +596,18 @@ img { -webkit-user-drag: none; }
   touch-action: none;
   cursor: crosshair;
 }
+.crop-card { display: grid; gap: 14px; justify-items: center; max-height: 96dvh; padding: 20px; background: #fff; border: 5px solid var(--ink); border-radius: 28px; box-shadow: 10px 10px 0 var(--ink); }
+.crop-card h2 { margin: 0; font-family: var(--pixel); font-weight: 400; font-size: 26px; }
+.crop-card .hint { margin: 0; text-align: center; }
+.crop-board { position: relative; overflow: hidden; border: 4px solid var(--ink); border-radius: 14px; touch-action: none; line-height: 0; user-select: none; }
+.crop-img { display: block; max-width: min(86vw, 760px); max-height: 58dvh; width: auto; height: auto; }
+.crop-box { position: absolute; border: 3px solid #fff; box-shadow: 0 0 0 9999px rgba(3, 10, 46, .6); cursor: move; }
+.crop-handle { position: absolute; width: 34px; height: 34px; background: var(--sun, #ffd23f); border: 3px solid var(--ink); border-radius: 50%; touch-action: none; }
+.crop-handle.tl { left: -17px; top: -17px; cursor: nwse-resize; }
+.crop-handle.tr { right: -17px; top: -17px; cursor: nesw-resize; }
+.crop-handle.bl { left: -17px; bottom: -17px; cursor: nesw-resize; }
+.crop-handle.br { right: -17px; bottom: -17px; cursor: nwse-resize; }
+.crop-foot { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
 .doodle-board { position: relative; }
 .doodle-canvas { transform-origin: 0 0; will-change: transform; }
 .doodle-canvas.tool-pan { cursor: grab; }

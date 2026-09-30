@@ -5,15 +5,16 @@ import {
   FRAMES,
   DEFAULT_PHOTO,
   getLayout,
-  panLimits,
   STICKERS,
   handlePoints,
+  loadImage,
   hitTest,
   renderComposite,
   toJpegBlob,
   whenLoaded,
 } from '../compose.js'
 import Doodle from './Doodle.jsx'
+import Crop from './Crop.jsx'
 import ColorSwatches from './ColorSwatches.jsx'
 import ToolIcon from './ToolIcon.jsx'
 import BrushSize from './BrushSize.jsx'
@@ -40,12 +41,13 @@ function Mini({ layout, shots, frameId, filterId, caption, lang, width = 96 }) {
   return <canvas ref={ref} className="mini" />
 }
 
-export default function Edit({ custom = [], hidden = [], groups: allGroups = [], assign = {}, layout, shots, edit, setEdit, onRetake, onExit, onFinish }) {
+export default function Edit({ custom = [], faceCustom = [], hidden = [], groups: allGroups = [], assign = {}, layout, shots, edit, setEdit, onRetake, onExit, onFinish }) {
   const { t, lang } = useI18n()
   const [tab, setTab] = useState('Frames')
   const [selectedId, setSelectedId] = useState(null)
   const [busy, setBusy] = useState(false)
   const [drawing, setDrawing] = useState(false)
+  const [cropping, setCropping] = useState(false)
   const [group, setGroup] = useState('all')
   const [customText, setCustomText] = useState('')
   const [textColor, setTextColor] = useState(TEXT_COLORS[0])
@@ -86,7 +88,11 @@ export default function Edit({ custom = [], hidden = [], groups: allGroups = [],
     return () => { live = false }
   }, [L, shots])
 
-  const placeFace = (item, shot, idx, photo) => placeOnFace(item, faces[shot][idx], shots[shot], L.slots[shot], photo, L)
+  const faceItems = useMemo(() => [...FACE_STICKERS.filter((s) => !hidden.includes(s.id)), ...faceCustom], [hidden, faceCustom])
+  const placeFace = (item, shot, idx, photo) => {
+    const img = loadImage(item.src)
+    return placeOnFace(item, faces[shot][idx], shots[shot], L.slots[shot], photo, L, img ? img.naturalHeight / img.naturalWidth : 1)
+  }
 
   // Face stickers follow the photo when it is zoomed or panned, until the user moves them by hand.
   useEffect(() => {
@@ -98,13 +104,13 @@ export default function Edit({ custom = [], hidden = [], groups: allGroups = [],
         ...e,
         stickers: e.stickers.map((s) => {
           const f = s.face
-          const item = f && FACE_STICKERS.find((i) => i.id === f.item)
+          const item = f && faceItems.find((i) => i.id === f.item)
           return item && faces[f.shot]?.[f.idx] ? { ...s, ...placeFace(item, f.shot, f.idx, photo) } : s
         }),
       }
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [edit.photo, faces])
+  }, [edit.photo, faces, faceItems])
 
   const patchEdit = (p) => setEdit((e) => ({ ...e, ...p }))
   const patchSticker = (id, fn) =>
@@ -129,12 +135,7 @@ export default function Edit({ custom = [], hidden = [], groups: allGroups = [],
 
   const onDown = (ev) => {
     const { x, y } = toLayoutXY(ev)
-    if (tab === 'Photo') {
-      const p = edit.photo || DEFAULT_PHOTO
-      drag.current = { mode: 'pan', x, y, ox0: p.ox, oy0: p.oy }
-      canvasRef.current.setPointerCapture(ev.pointerId)
-      return
-    }
+    if (tab === 'Photo') return
     if (tab === 'Draw') {
       const base = { color: inkColor, size: (inkSize * L.W) / 1200 }
       const stroke =
@@ -180,20 +181,6 @@ export default function Edit({ custom = [], hidden = [], groups: allGroups = [],
   const onMove = (ev) => {
     if (!drag.current) return
     const { x, y } = toLayoutXY(ev)
-    if (drag.current.mode === 'pan') {
-      const d = drag.current
-      const slot = L.slots[0]
-      const zoom = (edit.photo || DEFAULT_PHOTO).zoom
-      const { mx, my } = panLimits(shots[0], slot, zoom)
-      patchEdit({
-        photo: {
-          zoom,
-          ox: clamp(d.ox0 + (x - d.x) / slot.w, -mx, mx),
-          oy: clamp(d.oy0 + (y - d.y) / slot.h, -my, my),
-        },
-      })
-      return
-    }
     if (drag.current.mode === 'ink') {
       setEdit((e) => ({
         ...e,
@@ -304,7 +291,7 @@ export default function Edit({ custom = [], hidden = [], groups: allGroups = [],
         )
     setEdit((e) => ({
       ...e,
-      stickers: [...e.stickers.filter((s) => !(s.face && (added || FACE_STICKERS.find((i) => i.id === s.face.item)?.anchor === item.anchor))), ...fresh],
+      stickers: [...e.stickers.filter((s) => !(s.face && (added || faceItems.find((i) => i.id === s.face.item)?.anchor === item.anchor))), ...fresh],
     }))
     setSelectedId(null)
   }
@@ -321,7 +308,7 @@ export default function Edit({ custom = [], hidden = [], groups: allGroups = [],
       <section className="stage">
         <canvas
           ref={canvasRef}
-          className={`edit-canvas ${tab === 'Draw' ? 'drawing' : ''} ${tab === 'Photo' ? 'panning' : ''}`}
+          className={`edit-canvas ${tab === 'Draw' ? 'drawing' : ''} `}
           style={{ aspectRatio: `${L.W} / ${L.H}`, '--ar': L.W / L.H }}
           onPointerDown={onDown}
           onPointerMove={onMove}
@@ -402,7 +389,7 @@ export default function Edit({ custom = [], hidden = [], groups: allGroups = [],
               <p className="hint">{t('face.hint')}</p>
               <p className="note" role="status">{!faces ? t('face.looking') : faceCount ? t('face.found', { n: faceCount }) : t('face.none')}</p>
               <div className="grid stickers">
-                {FACE_STICKERS.map((item) => (
+                {faceItems.map((item) => (
                   <button key={item.id} className={`opt sticker ${faceCount && onFace(item) === faceCount ? 'on' : ''}`} disabled={!faceCount} onClick={() => toggleFace(item)}>
                     <img src={item.src} alt="" />
                   </button>
@@ -458,44 +445,8 @@ export default function Edit({ custom = [], hidden = [], groups: allGroups = [],
           {tab === 'Photo' && (
             <div className="photo-tab">
               <p className="hint">{t('edit.panHint')}</p>
-              {(() => {
-                const p = edit.photo || DEFAULT_PHOTO
-                const setZoom = (z) => {
-                  const zoom = clamp(Math.round(z * 100) / 100, 1, 4)
-                  const { mx, my } = panLimits(shots[0], L.slots[0], zoom)
-                  patchEdit({ photo: { zoom, ox: clamp(p.ox, -mx, mx), oy: clamp(p.oy, -my, my) } })
-                }
-                const nudge = (dx, dy) => {
-                  const { mx, my } = panLimits(shots[0], L.slots[0], p.zoom)
-                  patchEdit({ photo: { zoom: p.zoom, ox: clamp(p.ox + dx, -mx, mx), oy: clamp(p.oy + dy, -my, my) } })
-                }
-                const canMove = p.zoom > 1
-                return (
-                  <>
-                    <div className="crop-zoom">
-                      <div className="brush-head"><span>{t('edit.zoom')}</span><span className="brush-num">{Math.round(p.zoom * 100)}%</span></div>
-                      <div className="brush-row">
-                        <button className="tool" aria-label="-" onClick={() => setZoom(p.zoom - 0.25)} disabled={p.zoom <= 1}>−</button>
-                        <input type="range" min="1" max="4" step="0.05" value={p.zoom} aria-label={t('edit.zoom')} style={{ '--pct': `${((p.zoom - 1) / 3) * 100}%` }} onChange={(e) => setZoom(Number(e.target.value))} />
-                        <button className="tool" aria-label="+" onClick={() => setZoom(p.zoom + 0.25)} disabled={p.zoom >= 4}>+</button>
-                      </div>
-                      <div className="crop-presets">
-                        {[1, 1.5, 2, 3].map((z) => (
-                          <button key={z} className={`tool ${Math.abs(p.zoom - z) < 0.03 ? 'on' : ''}`} onClick={() => setZoom(z)}>{z}×</button>
-                        ))}
-                      </div>
-                    </div>
-                    <div className="crop-pad" role="group" aria-label={t('edit.move')}>
-                      <button className="tool up" aria-label="Up" disabled={!canMove} onClick={() => nudge(0, -0.05)}>▲</button>
-                      <button className="tool left" aria-label="Left" disabled={!canMove} onClick={() => nudge(-0.05, 0)}>◀</button>
-                      <button className="tool mid" aria-label={t('edit.center')} disabled={!canMove} onClick={() => patchEdit({ photo: { zoom: p.zoom, ox: 0, oy: 0 } })}>●</button>
-                      <button className="tool right" aria-label="Right" disabled={!canMove} onClick={() => nudge(0.05, 0)}>▶</button>
-                      <button className="tool down" aria-label="Down" disabled={!canMove} onClick={() => nudge(0, 0.05)}>▼</button>
-                    </div>
-                  </>
-                )
-              })()}
-              <button className="btn btn-ghost" onClick={() => patchEdit({ photo: DEFAULT_PHOTO })}>{t('edit.whole')}</button>
+              <button className="btn btn-sun" onClick={() => setCropping(true)}>{t('edit.crop')}</button>
+              <button className="btn btn-ghost" disabled={!edit.photo || edit.photo.zoom === 1} onClick={() => patchEdit({ photo: DEFAULT_PHOTO })}>{t('edit.whole')}</button>
               {layout === 'strip' && <p className="note">{t('edit.zoomAll')}</p>}
             </div>
           )}
@@ -561,6 +512,18 @@ export default function Edit({ custom = [], hidden = [], groups: allGroups = [],
           <button className="btn btn-sun big" onClick={finish} disabled={busy}>{busy ? t('edit.busy') : t('edit.finish')}</button>
         </div>
       </aside>
+      {cropping && (
+        <Crop
+          shot={shots[0]}
+          slot={L.slots[0]}
+          photo={edit.photo || DEFAULT_PHOTO}
+          onCancel={() => setCropping(false)}
+          onDone={(photo) => {
+            patchEdit({ photo })
+            setCropping(false)
+          }}
+        />
+      )}
       {drawing && <Doodle colors={edit.colors} onAddColor={addColor} onCancel={() => setDrawing(false)} onDone={addDoodle} />}
     </main>
   )

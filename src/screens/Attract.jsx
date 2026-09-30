@@ -3,6 +3,7 @@ import VideoView from '../VideoView.jsx'
 import { fileToShot, normalizePhoneUrl, testPhone } from '../camera.js'
 import { LAYOUTS, STICKERS } from '../compose.js'
 import { groupOf } from '../customStickers.js'
+import { FACE_STICKERS } from '../faces.js'
 import { setPin } from '../pin.js'
 import PinPad from './PinPad.jsx'
 import { LANGS, useI18n } from '../i18n.jsx'
@@ -232,6 +233,36 @@ function Settings({ cam, custom, onClose, onTestFiles }) {
               ))}
             </div>
           </details>
+        </div>
+        <div className="field">
+          Face stickers
+          <span className="note">These land on faces by themselves. Use a transparent PNG cropped tight around the hat or glasses, facing the camera. Tap a built-in one to hide or show it.</span>
+          {[['top', 'On the head (hats, crowns)'], ['eyes', 'On the eyes (glasses)']].map(([anchor, title]) => (
+            <div className="folder" key={anchor}>
+              <div className="folder-head">
+                <strong>{title}</strong>
+                <label className="btn btn-ghost">
+                  + Add pictures
+                  <input type="file" accept="image/*" multiple hidden onChange={(e) => { custom.add([...e.target.files], '', anchor); e.target.value = '' }} />
+                </label>
+              </div>
+              <div className="custom-grid">
+                {[...custom.faceList, ...FACE_STICKERS].filter((f) => f.anchor === anchor).map((f) => {
+                  const off = !f.custom && custom.hidden.includes(f.id)
+                  return (
+                    <div className={`custom-item ${f.custom ? '' : 'builtin'} ${off ? 'off' : ''}`} key={f.id} onClick={() => !f.custom && custom.toggleBuiltin(f.id)}>
+                      <img src={f.src} alt="" />
+                      {f.custom ? (
+                        <button aria-label="Remove face sticker" onClick={(e) => { e.stopPropagation(); custom.remove(f.id) }}>×</button>
+                      ) : (
+                        <span className="builtin-badge">{off ? 'Hidden' : ''}</span>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          ))}
         </div>
         <label className="btn btn-ghost test-btn">
           Test: use my own picture

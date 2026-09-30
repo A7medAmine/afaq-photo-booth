@@ -70,14 +70,14 @@ export function shotToLayout(shot, slot, photo, pt) {
 }
 
 // Returns { x, y, size, rot } (x/y/size as fractions of layout W) for one face sticker.
-// Face stickers are square emoji, so height equals width.
-export function placeOnFace(item, face, shot, slot, photo, layout) {
+// aspect is image height / width, used to lift hats clear of the forehead.
+export function placeOnFace(item, face, shot, slot, photo, layout, aspect = 1) {
   const eyes = shotToLayout(shot, slot, photo, face.eyes)
   const forehead = shotToLayout(shot, slot, photo, face.forehead)
   const w = (item.anchor === 'eyes' ? face.eyeSpan : face.width) * eyes.k * item.width
   let { x, y } = eyes
   if (item.anchor === 'top') {
-    const lift = w * 0.4
+    const lift = w * aspect * 0.4
     x = forehead.x + Math.sin(face.roll) * lift
     y = forehead.y - Math.cos(face.roll) * lift
   }

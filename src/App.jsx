@@ -69,6 +69,7 @@ export default function App() {
         edit={edit}
         custom={custom.list}
         hidden={custom.hidden}
+        faceCustom={custom.faceList}
         groups={custom.groups}
         assign={custom.assign}
         setEdit={setEdit}
