@@ -19,7 +19,7 @@ import ColorSwatches from './ColorSwatches.jsx'
 import ToolIcon from './ToolIcon.jsx'
 import BrushSize from './BrushSize.jsx'
 import { groupOf } from '../customStickers.js'
-import { detectFaces, FACE_STICKERS, PARTS, placeOnFace, shotToLayout } from '../faces.js'
+import { detectFaces, FACE_STICKERS, PARTS, placeOnFace, shotToLayout, whenIdle } from '../faces.js'
 import { OPEN_SHAPES, SHAPES } from '../shapes.js'
 import { BUBBLE_TEXT, useI18n } from '../i18n.jsx'
 
@@ -33,6 +33,18 @@ const uid = () => Math.random().toString(36).slice(2, 9)
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v))
 const MAX_ZOOM = 5
 const ZOOM_STEP = 1.5
+
+// The frame and filter previews each redraw every shot; drawing full-size shots (with a CSS filter)
+// into a 96px canvas many times over stalls the screen, so they use shrunken copies.
+const PREVIEW_W = 360
+function shrink(shot) {
+  if (shot.width <= PREVIEW_W) return shot
+  const c = document.createElement('canvas')
+  c.width = PREVIEW_W
+  c.height = Math.round((PREVIEW_W * shot.height) / shot.width)
+  c.getContext('2d').drawImage(shot, 0, 0, c.width, c.height)
+  return c
+}
 
 function Mini({ layout, shots, frameId, filterId, caption, lang, width = 96 }) {
   const ref = useRef(null)
@@ -70,6 +82,7 @@ export default function Edit({ custom = [], faceCustom = [], hidden = [], groups
   const [view, setView] = useState({ z: 1, x: 0, y: 0 })
   const [hand, setHand] = useState(false)
   const L = useMemo(() => getLayout(layout, shots), [layout, shots])
+  const miniShots = useMemo(() => shots.map(shrink), [shots])
 
   const state = useMemo(() => ({ layout, shots, lang, ...edit }), [layout, shots, lang, edit])
 
@@ -143,7 +156,8 @@ export default function Edit({ custom = [], faceCustom = [], hidden = [], groups
 
   useEffect(() => {
     let live = true
-    Promise.all(L.slots.map((_, i) => detectFaces(shots[i])))
+    whenIdle()
+      .then(() => live && Promise.all(L.slots.map((_, i) => detectFaces(shots[i]))))
       .then((f) => live && (setFaces(f), setWho([])))
       .catch(() => live && setFaces([]))
     return () => { live = false }
@@ -505,7 +519,7 @@ export default function Edit({ custom = [], faceCustom = [], hidden = [], groups
             <div className="grid minis">
               {FRAMES.map((f) => (
                 <button key={f.id} className={`opt ${edit.frameId === f.id ? 'on' : ''}`} onClick={() => patchEdit({ frameId: f.id })}>
-                  <Mini layout={layout} shots={shots} caption={edit.caption} lang={lang} filterId={edit.filterId} frameId={f.id} />
+                  <Mini layout={layout} shots={miniShots} caption={edit.caption} lang={lang} filterId={edit.filterId} frameId={f.id} />
                   <span>{t(`frame.${f.id}`)}</span>
                 </button>
               ))}
@@ -516,7 +530,7 @@ export default function Edit({ custom = [], faceCustom = [], hidden = [], groups
             <div className="grid minis">
               {FILTERS.map((f) => (
                 <button key={f.id} className={`opt ${edit.filterId === f.id ? 'on' : ''}`} onClick={() => patchEdit({ filterId: f.id })}>
-                  <Mini layout={layout} shots={shots} caption={edit.caption} lang={lang} frameId={edit.frameId} filterId={f.id} />
+                  <Mini layout={layout} shots={miniShots} caption={edit.caption} lang={lang} frameId={edit.frameId} filterId={f.id} />
                   <span>{t(`filter.${f.id}`)}</span>
                 </button>
               ))}

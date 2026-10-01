@@ -6,6 +6,17 @@ import { beep } from '../sound.js'
 import { useI18n } from '../i18n.jsx'
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms))
+const THUMB_W = 240
+
+// Encoding a full-size shot to a data URL blocks the main thread (and with it the phone preview),
+// so only the new shot is shrunk and encoded, asynchronously.
+function thumbUrl(shot) {
+  const c = document.createElement('canvas')
+  c.width = THUMB_W
+  c.height = Math.round((THUMB_W * shot.height) / shot.width)
+  c.getContext('2d').drawImage(shot, 0, 0, c.width, c.height)
+  return new Promise((r) => c.toBlob((b) => r(b ? URL.createObjectURL(b) : ''), 'image/jpeg', 0.7))
+}
 
 export default function Capture({ cam, layout, onDone, onCancel }) {
   const L = LAYOUTS[layout]
@@ -36,6 +47,7 @@ export default function Capture({ cam, layout, onDone, onCancel }) {
   useEffect(() => {
     let dead = false
     const shots = []
+    const urls = []
     ;(async () => {
       await wait(1200)
       for (let i = 0; i < L.shots; i++) {
@@ -56,14 +68,23 @@ export default function Capture({ cam, layout, onDone, onCancel }) {
         setFlash(false)
         const shot = await still
         if (dead) return
-        if (shot) shots.push(shot)
-        setThumbs(shots.map((s) => s.toDataURL('image/jpeg', 0.5)))
+        if (shot) {
+          shots.push(shot)
+          const at = shots.length - 1
+          thumbUrl(shot).then((u) => {
+            if (!u) return
+            urls.push(u)
+            if (dead) return URL.revokeObjectURL(u)
+            setThumbs((t) => Object.assign([...t], { [at]: u }))
+          })
+        }
         await wait(i < L.shots - 1 ? 1100 : 500)
       }
       if (!dead) onDone(shots)
     })()
     return () => {
       dead = true
+      urls.forEach((u) => URL.revokeObjectURL(u))
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])

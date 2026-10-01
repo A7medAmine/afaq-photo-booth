@@ -87,10 +87,24 @@ function getLandmarker() {
 // Lets the browser paint and handle input between detection passes.
 const breathe = () => new Promise((r) => setTimeout(r, 0))
 
+const idle = (fn, timeout) => (window.requestIdleCallback ? requestIdleCallback(fn, { timeout }) : setTimeout(fn, 300))
+
+// The first detect() compiles the GPU shaders and can block for a second or more, so it is run
+// once on a blank image at boot instead of when the guest reaches the edit screen.
 export function warmUpFaces() {
-  getLandmarker().catch(() => { landmarker = null })
-  const idle = window.requestIdleCallback || ((fn) => setTimeout(fn, 300))
+  getLandmarker()
+    .then((lm) => idle(() => {
+      const c = document.createElement('canvas')
+      c.width = c.height = 256
+      try { lm.detect(c) } catch { /* warm-up only */ }
+    }, 3000))
+    .catch(() => { landmarker = null })
   idle(() => FACE_STICKERS.forEach((s) => loadImage(s.src)))
+}
+
+// Lets the edit screen paint before detection starts taking main-thread time.
+export function whenIdle(timeout = 600) {
+  return new Promise((r) => idle(r, timeout))
 }
 
 const mid = (a, b) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 })
