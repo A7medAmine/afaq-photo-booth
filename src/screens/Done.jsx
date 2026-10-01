@@ -8,23 +8,45 @@ const headers = (extra) => ({ ...(KEY ? { 'X-Upload-Key': KEY } : {}), ...extra 
 
 // Photos are only stored for a few minutes unless the guest ticks the box. A photo from an earlier
 // pass through the editor is deleted once the new one is uploaded, so nothing is left behind.
-export default function Done({ blob, share, onShare, booth, editsLeft, extendsLeft, onEdit, onExtend, onNext }) {
+// The medium preview goes up first so the QR code shows quickly; the full-resolution file follows
+// in the background and the download link serves it as soon as it has arrived.
+export default function Done({ final, share, onShare, booth, editsLeft, extendsLeft, onEdit, onExtend, onNext }) {
   const { t } = useI18n()
   const [status, setStatus] = useState('uploading')
+  const [fullStatus, setFullStatus] = useState('idle')
   const [qr, setQr] = useState('')
   const [link, setLink] = useState('')
   const [left, setLeft] = useState(booth.doneSeconds)
   const [keep, setKeep] = useState(!!share?.keep)
   const [ttl, setTtl] = useState(10)
-  const preview = useMemo(() => URL.createObjectURL(blob), [blob])
+  const preview = useMemo(() => URL.createObjectURL(final.preview), [final])
+  const fullUrl = useMemo(() => URL.createObjectURL(final.full), [final])
+  useEffect(() => () => [preview, fullUrl].forEach((u) => URL.revokeObjectURL(u)), [preview, fullUrl])
+
+  const sendFull = async (id, token) => {
+    setFullStatus('sending')
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const r = await fetch(`${CLOUD}/api/photos/${id}/full`, {
+          method: 'PUT',
+          headers: headers({ 'Content-Type': 'image/jpeg', 'X-Token': token }),
+          body: final.full,
+        })
+        if (r.ok) return setFullStatus('done')
+        if (r.status < 500) break
+      } catch { /* retry */ }
+      await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)))
+    }
+    setFullStatus('failed')
+  }
 
   const upload = useCallback(async () => {
     setStatus('uploading')
     try {
       const res = await fetch(`${CLOUD}/api/photos`, {
         method: 'POST',
-        headers: headers({ 'Content-Type': 'image/jpeg', ...(share?.keep ? { 'X-Keep': '1' } : {}) }),
-        body: blob,
+        headers: headers({ 'Content-Type': 'image/jpeg', 'X-Variant': 'preview', ...(share?.keep ? { 'X-Keep': '1' } : {}) }),
+        body: final.preview,
       })
       if (!res.ok) throw new Error(`Upload failed (${res.status})`)
       const { id, token, url, ttlMinutes } = await res.json()
@@ -32,13 +54,14 @@ export default function Done({ blob, share, onShare, booth, editsLeft, extendsLe
       onShare({ id, token, keep: !!share?.keep })
       setTtl(ttlMinutes)
       setLink(url)
+      sendFull(id, token)
       setQr(await QRCode.toDataURL(url, { width: 640, margin: 1, color: { dark: '#030a2e', light: '#ffffff' } }))
       setStatus('ready')
     } catch {
       setStatus('error')
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [blob])
+  }, [final])
 
   useEffect(() => {
     upload()
@@ -91,7 +114,7 @@ export default function Done({ blob, share, onShare, booth, editsLeft, extendsLe
             <p>{t('done.errBody')}</p>
             <div className="row">
               <button className="btn btn-sun big" onClick={upload}>{t('done.retry')}</button>
-              <a className="btn btn-ghost big" href={preview} download="afaq-photo.jpg">{t('done.save')}</a>
+              <a className="btn btn-ghost big" href={fullUrl} download="afaq-photo.jpg">{t('done.save')}</a>
             </div>
           </>
         )}
@@ -100,6 +123,8 @@ export default function Done({ blob, share, onShare, booth, editsLeft, extendsLe
             <h1>{t('done.scan')}</h1>
             <div className="qr"><img src={qr} alt={`${t('done.qrAlt')}: ${link}`} /></div>
             <p>{t('done.scanBody')}</p>
+            {fullStatus === 'sending' && <p className="note" role="status">{t('done.fullSending')}</p>}
+            {fullStatus === 'failed' && <p className="note" role="status">{t('done.fullFailed')}</p>}
             <label className="keep">
               <input type="checkbox" checked={keep} onChange={(e) => toggleKeep(e.target.checked)} />
               <span>

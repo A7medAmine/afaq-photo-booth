@@ -268,9 +268,10 @@ export function useCamera() {
       setError('')
       try {
         if (forceDemo) throw new Error('demo requested')
+        // Ask for 4K so the camera runs at its best mode; the browser falls back to the closest it supports.
         const video = {
-          width: { ideal: 1920 },
-          height: { ideal: 1080 },
+          width: { ideal: 3840 },
+          height: { ideal: 2160 },
           ...(settings.deviceId ? { deviceId: { exact: settings.deviceId } } : { facingMode: 'user' }),
         }
         const s = await navigator.mediaDevices.getUserMedia({ video, audio: false })
@@ -315,6 +316,9 @@ export function capture(video, mirror) {
   return c
 }
 
+// Shots stay at camera resolution; this only guards against absurd sizes from imported files.
+const MAX_SHOT_SIDE = 8000
+
 export async function grabStill(cam, video, mirror) {
   const fromPreview = () => (video?.videoWidth ? capture(video, mirror) : null)
   if (cam.settings.source !== 'phone' || cam.phoneStatus !== 'live') return fromPreview()
@@ -323,7 +327,7 @@ export async function grabStill(cam, video, mirror) {
     const r = await fetchTimeout(`${phoneBaseOf(cam.settings)}/photo`, 10000)
     if (!r.ok) throw new Error(`Photo status ${r.status}`)
     const bmp = await createImageBitmap(await r.blob())
-    const k = Math.min(1, 2400 / Math.max(bmp.width, bmp.height))
+    const k = Math.min(1, MAX_SHOT_SIDE / Math.max(bmp.width, bmp.height))
     const c = document.createElement('canvas')
     c.width = Math.round(bmp.width * k)
     c.height = Math.round(bmp.height * k)
@@ -342,7 +346,7 @@ export async function grabStill(cam, video, mirror) {
 
 export async function fileToShot(file) {
   const bmp = await createImageBitmap(file)
-  const k = Math.min(1, 2400 / Math.max(bmp.width, bmp.height))
+  const k = Math.min(1, MAX_SHOT_SIDE / Math.max(bmp.width, bmp.height))
   const c = document.createElement('canvas')
   c.width = Math.round(bmp.width * k)
   c.height = Math.round(bmp.height * k)

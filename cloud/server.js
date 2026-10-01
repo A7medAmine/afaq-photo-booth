@@ -23,7 +23,7 @@ const app = express()
 
 app.use((req, res, next) => {
   res.set('Access-Control-Allow-Origin', '*')
-  res.set('Access-Control-Allow-Headers', 'Content-Type, X-Upload-Key, X-Token, X-Keep')
+  res.set('Access-Control-Allow-Headers', 'Content-Type, X-Upload-Key, X-Token, X-Keep, X-Variant')
   res.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
   if (req.method === 'OPTIONS') return res.sendStatus(204)
   next()
@@ -44,8 +44,13 @@ app.post('/api/phone/usb', (req, res) => {
 
 const newId = () => crypto.randomBytes(6).toString('base64url')
 const isId = (id) => /^[A-Za-z0-9_-]{6,12}$/.test(id)
-const keptFile = (id) => path.join(DATA_DIR, `${id}.jpg`)
-const tempFile = (id) => path.join(TEMP_DIR, `${id}.jpg`)
+// Each photo has a full-resolution file and a medium preview (`.p.jpg`). Either may be missing:
+// the booth sends the preview first, and older booths send only the full file.
+const VARIANTS = ['full', 'preview']
+const nameOf = (id, variant) => (variant === 'preview' ? `${id}.p.jpg` : `${id}.jpg`)
+const keptFile = (id, variant = 'full') => path.join(DATA_DIR, nameOf(id, variant))
+const tempFile = (id, variant = 'full') => path.join(TEMP_DIR, nameOf(id, variant))
+const fileIn = (kept, id, variant) => (kept ? keptFile(id, variant) : tempFile(id, variant))
 const baseUrl = (req) => PUBLIC_URL || `${req.protocol}://${req.get('host')}`
 const tokenOf = (id) => crypto.createHmac('sha256', TOKEN_SECRET).update(id).digest('base64url').slice(0, 22)
 const allowed = (req, id) => {
@@ -55,14 +60,28 @@ const allowed = (req, id) => {
 }
 
 // Where a photo lives right now, and when it disappears (null = kept).
+// The expiry runs from the first upload, so the later full file does not extend it.
 function locate(id) {
   if (!isId(id)) return null
-  if (fs.existsSync(keptFile(id))) return { file: keptFile(id), expires: null }
-  try {
-    const { mtimeMs } = fs.statSync(tempFile(id))
-    if (Date.now() - mtimeMs < TEMP_MS) return { file: tempFile(id), expires: mtimeMs + TEMP_MS }
-  } catch { /* not there */ }
-  return null
+  const present = (kept) => VARIANTS.filter((v) => fs.existsSync(fileIn(kept, id, v)))
+  const kept = present(true)
+  if (kept.length) return { kept: true, variants: kept, expires: null }
+  const temp = present(false)
+  if (!temp.length) return null
+  const born = Math.min(...temp.map((v) => fs.statSync(tempFile(id, v)).mtimeMs))
+  if (Date.now() - born >= TEMP_MS) return null
+  return { kept: false, variants: temp, expires: born + TEMP_MS }
+}
+
+// Serves the asked-for variant, falling back to the other one while it is missing.
+const pick = (at, id, want) => fileIn(at.kept, id, at.variants.includes(want) ? want : at.variants[0])
+
+function setKept(id, at, keep) {
+  for (const v of at.variants) fs.renameSync(fileIn(at.kept, id, v), fileIn(keep, id, v))
+  if (!keep) {
+    const now = new Date()
+    for (const v of at.variants) fs.utimesSync(tempFile(id, v), now, now)
+  }
 }
 
 function sweep() {
@@ -76,7 +95,9 @@ function sweep() {
 sweep()
 setInterval(sweep, 30 * 1000).unref()
 
-app.post('/api/photos', express.raw({ type: 'image/*', limit: '20mb' }), (req, res) => {
+const rawJpeg = express.raw({ type: 'image/*', limit: '60mb' })
+
+app.post('/api/photos', rawJpeg, (req, res) => {
   if (UPLOAD_KEY && req.get('X-Upload-Key') !== UPLOAD_KEY) {
     return res.status(401).json({ error: 'bad upload key' })
   }
@@ -85,8 +106,25 @@ app.post('/api/photos', express.raw({ type: 'image/*', limit: '20mb' }), (req, r
   }
   const id = newId()
   const keep = req.get('X-Keep') === '1'
-  fs.writeFileSync(keep ? keptFile(id) : tempFile(id), req.body)
+  const variant = req.get('X-Variant') === 'preview' ? 'preview' : 'full'
+  fs.writeFileSync(fileIn(keep, id, variant), req.body)
   res.json({ id, token: tokenOf(id), keep, ttlMinutes: TEMP_MINUTES, url: `${baseUrl(req)}/p/${id}` })
+})
+
+// The full-resolution file, sent after the preview. It lands next to the preview, kept or not.
+app.put('/api/photos/:id/full', rawJpeg, (req, res) => {
+  const { id } = req.params
+  if (!isId(id) || !allowed(req, id)) return res.sendStatus(403)
+  const at = locate(id)
+  if (!at) return res.sendStatus(404)
+  if (!Buffer.isBuffer(req.body) || req.body.length < 1000) {
+    return res.status(400).json({ error: 'send the JPEG as the raw request body' })
+  }
+  const file = fileIn(at.kept, id, 'full')
+  const stamp = !at.kept && at.variants.includes('preview') ? fs.statSync(tempFile(id, 'preview')).mtime : null
+  fs.writeFileSync(file, req.body)
+  if (stamp) fs.utimesSync(file, stamp, stamp)
+  res.json({ ok: true })
 })
 
 // The guest can tick or untick "let the club keep my photo" after upload. Unticked photos expire.
@@ -96,28 +134,29 @@ app.put('/api/photos/:id/keep', express.json(), (req, res) => {
   const at = locate(id)
   if (!at) return res.sendStatus(404)
   const keep = req.body?.keep === true
-  if (keep && at.expires) {
-    fs.renameSync(tempFile(id), keptFile(id))
-  } else if (!keep && !at.expires) {
-    fs.renameSync(keptFile(id), tempFile(id))
-    fs.utimesSync(tempFile(id), new Date(), new Date())
-  }
+  if (keep !== at.kept) setKept(id, at, keep)
   res.json({ keep })
 })
 
 app.delete('/api/photos/:id', (req, res) => {
   const { id } = req.params
   if (!isId(id) || !allowed(req, id)) return res.sendStatus(403)
-  for (const f of [keptFile(id), tempFile(id)]) fs.rmSync(f, { force: true })
+  for (const v of VARIANTS) for (const f of [keptFile(id, v), tempFile(id, v)]) fs.rmSync(f, { force: true })
   res.sendStatus(204)
 })
 
+// /files/:id.jpg is the full photo; ?size=preview is the medium copy shown on the page.
 app.get('/files/:id.jpg', (req, res) => {
-  const at = locate(req.params.id)
+  const { id } = req.params
+  const at = locate(id)
   if (!at) return res.sendStatus(404)
-  if (req.query.dl) res.set('Content-Disposition', `attachment; filename="afaq-photo-${req.params.id}.jpg"`)
-  res.set('Cache-Control', at.expires ? 'private, no-store' : 'public, max-age=86400')
-  res.type('image/jpeg').sendFile(at.file)
+  const want = req.query.size === 'preview' ? 'preview' : 'full'
+  const suffix = want === 'preview' ? '-small' : ''
+  if (req.query.dl) res.set('Content-Disposition', `attachment; filename="afaq-photo-${id}${suffix}.jpg"`)
+  // The full file can still be on its way, so only a kept photo with both files is cached.
+  const final = !at.expires && at.variants.length === VARIANTS.length
+  res.set('Cache-Control', final ? 'public, max-age=86400' : 'private, no-store')
+  res.type('image/jpeg').sendFile(pick(at, id, want))
 })
 
 app.get('/p/:id', (req, res) => {
@@ -125,7 +164,7 @@ app.get('/p/:id', (req, res) => {
   const at = locate(id)
   if (!at) return res.status(404).type('html').send(page('Photo not found', notFound()))
   const left = at.expires ? Math.max(1, Math.ceil((at.expires - Date.now()) / 60000)) : 0
-  res.type('html').send(page('Your AFAQ photo', photoView(id, left), at.expires ? '' : `${baseUrl(req)}/files/${id}.jpg`))
+  res.type('html').send(page('Your AFAQ photo', photoView(id, left), at.expires ? '' : `${baseUrl(req)}/files/${id}.jpg?size=preview`))
 })
 
 app.get('/', (_req, res) => res.type('html').send(page('AFAQ Photo Booth', notFound(true))))
@@ -159,6 +198,7 @@ ${ogImage ? `<meta property="og:image" content="${ogImage}">` : ''}
   a.btn { display:block; padding:18px 20px; background:var(--sun); color:var(--ink); text-decoration:none;
     font-weight:800; font-size:20px; border:4px solid var(--ink); border-radius:18px; box-shadow:6px 6px 0 var(--ink); }
   a.btn:active { transform:translate(4px,4px); box-shadow:2px 2px 0 var(--ink); }
+  a.alt { display:inline-block; margin-top:16px; color:#fff; font-weight:700; }
   small { display:block; margin-top:18px; opacity:.75; }
 </style>
 </head>
@@ -168,10 +208,11 @@ ${body}
 </main></body></html>`
 
 const photoView = (id, left) => `
-<div class="card"><img src="/files/${id}.jpg" alt="Your photo booth picture"></div>
+<div class="card"><img src="/files/${id}.jpg?size=preview" alt="Your photo booth picture"></div>
 <h1>Looking good!</h1>
 <p>Save your picture to your phone.</p>
-<a class="btn" href="/files/${id}.jpg?dl=1" download>Download photo</a>
+<a class="btn" href="/files/${id}.jpg?dl=1" download>Download full quality</a>
+<a class="alt" href="/files/${id}.jpg?size=preview&dl=1" download>Smaller file, quicker to share</a>
 <small>${left ? `Your photo is deleted from our server in about ${left} minute${left === 1 ? '' : 's'}, so download it now.` : ''} Tip: on iPhone, press and hold the photo and choose Add to Photos.</small>`
 
 const notFound = (home) => `
