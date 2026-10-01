@@ -24,7 +24,7 @@ export default function App() {
   const [layout, setLayout] = useState('single')
   const [shots, setShots] = useState([])
   const [edit, setEdit] = useState(freshEdit)
-  const [finalBlob, setFinalBlob] = useState(null)
+  const [final, setFinal] = useState(null)
   const [share, setShare] = useState(null)
   const [used, setUsed] = useState({ edits: 0, extends: 0 })
   const { booth, updateBooth } = useBoothSettings()
@@ -49,7 +49,7 @@ export default function App() {
     setScreen('attract')
     setShots([])
     setEdit(freshEdit())
-    setFinalBlob(null)
+    setFinal(null)
     setShare(null)
     setUsed({ edits: 0, extends: 0 })
   }, [])
@@ -86,8 +86,8 @@ export default function App() {
         setEdit={setEdit}
         onRetake={() => setScreen('capture')}
         onExit={reset}
-        onFinish={(blob) => {
-          setFinalBlob(blob)
+        onFinish={(result) => {
+          setFinal(result)
           setScreen('done')
         }}
       />
@@ -105,7 +105,7 @@ export default function App() {
     )
   if (screen === 'done') return (
       <Done
-        blob={finalBlob}
+        final={final}
         share={share}
         onShare={setShare}
         booth={booth}

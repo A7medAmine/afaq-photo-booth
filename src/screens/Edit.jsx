@@ -10,7 +10,8 @@ import {
   loadImage,
   hitTest,
   renderComposite,
-  toJpegBlob,
+  renderFinal,
+  scaledCopy,
   whenLoaded,
 } from '../compose.js'
 import Doodle from './Doodle.jsx'
@@ -34,17 +35,11 @@ const clamp = (v, a, b) => Math.min(b, Math.max(a, v))
 const MAX_ZOOM = 5
 const ZOOM_STEP = 1.5
 
-// The frame and filter previews each redraw every shot; drawing full-size shots (with a CSS filter)
-// into a 96px canvas many times over stalls the screen, so they use shrunken copies.
-const PREVIEW_W = 360
-function shrink(shot) {
-  if (shot.width <= PREVIEW_W) return shot
-  const c = document.createElement('canvas')
-  c.width = PREVIEW_W
-  c.height = Math.round((PREVIEW_W * shot.height) / shot.width)
-  c.getContext('2d').drawImage(shot, 0, 0, c.width, c.height)
-  return c
-}
+// Editing works on smaller copies of the shots so redraws and face detection stay fast;
+// the full-resolution originals are only used for the final export.
+const WORK_SIDE = 2000
+// The frame and filter previews each redraw every shot, so they get even smaller copies.
+const PREVIEW_SIDE = 360
 
 function Mini({ layout, shots, frameId, filterId, caption, lang, width = 96 }) {
   const ref = useRef(null)
@@ -55,7 +50,7 @@ function Mini({ layout, shots, frameId, filterId, caption, lang, width = 96 }) {
   return <canvas ref={ref} className="mini" />
 }
 
-export default function Edit({ custom = [], faceCustom = [], hidden = [], groups: allGroups = [], assign = {}, layout, shots, edit, setEdit, onRetake, onExit, onFinish }) {
+export default function Edit({ custom = [], faceCustom = [], hidden = [], groups: allGroups = [], assign = {}, layout, shots: fullShots, edit, setEdit, onRetake, onExit, onFinish }) {
   const { t, lang } = useI18n()
   const [tab, setTab] = useState('Frames')
   const [selectedId, setSelectedId] = useState(null)
@@ -81,8 +76,9 @@ export default function Edit({ custom = [], faceCustom = [], hidden = [], groups
   const pinch = useRef(null)
   const [view, setView] = useState({ z: 1, x: 0, y: 0 })
   const [hand, setHand] = useState(false)
+  const shots = useMemo(() => fullShots.map((s) => scaledCopy(s, WORK_SIDE)), [fullShots])
   const L = useMemo(() => getLayout(layout, shots), [layout, shots])
-  const miniShots = useMemo(() => shots.map(shrink), [shots])
+  const miniShots = useMemo(() => shots.map((s) => scaledCopy(s, PREVIEW_SIDE)), [shots])
 
   const state = useMemo(() => ({ layout, shots, lang, ...edit }), [layout, shots, lang, edit])
 
@@ -453,7 +449,7 @@ export default function Edit({ custom = [], faceCustom = [], hidden = [], groups
   const finish = async () => {
     setBusy(true)
     setSelectedId(null)
-    onFinish(await toJpegBlob(state))
+    onFinish(await renderFinal({ ...state, shots: fullShots }))
   }
 
   return (

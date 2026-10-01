@@ -136,6 +136,7 @@ const page = (title, body, ogImage = '') => `<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${title}</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <meta property="og:title" content="${title}">
 ${ogImage ? `<meta property="og:image" content="${ogImage}">` : ''}
 <style>
@@ -177,6 +178,7 @@ const notFound = (home) => `
 <h1>${home ? 'AFAQ Photo Booth' : 'Photo not found'}</h1>
 <p>${home ? 'Scan the QR code at the booth to get your photo.' : 'This link may be wrong, or the photo has expired or was removed. Ask at the booth for a new code.'}</p>`
 
+app.get('/favicon.svg', (_req, res) => res.sendFile(path.join(__dirname, 'public', 'favicon.svg')))
 app.use('/assets', express.static(path.join(__dirname, 'public', 'assets')))
 app.use('/fonts', express.static(path.join(__dirname, 'public', 'fonts')))
 

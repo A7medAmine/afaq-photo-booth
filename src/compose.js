@@ -390,7 +390,7 @@ export const FRAMES = [
       ctx.strokeStyle = '#ff5fa2'
       ctx.lineWidth = 3
       ctx.shadowColor = '#ff5fa2'
-      ctx.shadowBlur = 12
+      ctx.shadowBlur = 12 * pixelScale(ctx)
       const s = 60
       ctx.beginPath()
       for (let x = 0; x <= W; x += s) {
@@ -514,6 +514,13 @@ export function stickerBox(ctx, s, W) {
   return { w: tw + fs, h: fs * 1.9, fs }
 }
 
+// Shadow blur and offset ignore the canvas transform, so they are scaled by hand to look the
+// same in the small editor canvas and the full-resolution export.
+function pixelScale(ctx) {
+  const m = ctx.getTransform()
+  return Math.hypot(m.a, m.b)
+}
+
 function roundRect(ctx, x, y, w, h, r) {
   ctx.beginPath()
   ctx.roundRect(x, y, w, h, r)
@@ -539,9 +546,10 @@ function drawSticker(ctx, s, W, H) {
   ctx.rotate(s.rot)
   if (s.blend) ctx.globalCompositeOperation = s.blend
   if (s.alpha != null) ctx.globalAlpha = s.alpha
+  const px = pixelScale(ctx)
   if (!s.flat) ctx.shadowColor = 'rgba(3,10,46,.35)'
-  if (!s.flat) ctx.shadowBlur = 14
-  if (!s.flat) ctx.shadowOffsetY = 8
+  if (!s.flat) ctx.shadowBlur = 14 * px
+  if (!s.flat) ctx.shadowOffsetY = 8 * px
   if (s.kind === 'img') {
     const img = loadImage(s.src)
     if (img) {
@@ -564,8 +572,8 @@ function drawSticker(ctx, s, W, H) {
     const lw = box.fs * 0.14
     ctx.shadowColor = INK
     ctx.shadowBlur = 0
-    ctx.shadowOffsetX = lw * 1.2
-    ctx.shadowOffsetY = lw * 1.2
+    ctx.shadowOffsetX = lw * 1.2 * px
+    ctx.shadowOffsetY = lw * 1.2 * px
     ctx.fillStyle = s.color
     roundRect(ctx, -box.w / 2, -box.h / 2, box.w, box.h, box.h * 0.32)
     ctx.fill()
@@ -951,8 +959,43 @@ export function hitTest(ctx, state, px, py) {
   return null
 }
 
-export function toJpegBlob(state) {
+// Returns a smaller copy of a shot or canvas, or the source itself when it already fits.
+export function scaledCopy(src, maxSide) {
+  const k = maxSide / Math.max(src.width, src.height)
+  if (k >= 1) return src
   const c = document.createElement('canvas')
-  renderComposite(c, state, { scale: 1, selectedId: null })
-  return new Promise((resolve) => c.toBlob(resolve, 'image/jpeg', 0.92))
+  c.width = Math.round(src.width * k)
+  c.height = Math.round(src.height * k)
+  const ctx = c.getContext('2d')
+  ctx.imageSmoothingQuality = 'high'
+  ctx.drawImage(src, 0, 0, c.width, c.height)
+  return c
+}
+
+const MAX_EXPORT_PIXELS = 40e6
+const MAX_CANVAS_SIDE = 16384
+const PREVIEW_SIDE = 1600
+
+// The layout is designed at roughly 1200px wide; the export is scaled up so the photos keep
+// their full camera resolution instead of being shrunk into the layout.
+export function exportScale(state) {
+  const { W, H, slots } = getLayout(state.layout, state.shots)
+  const zoom = (state.photo || DEFAULT_PHOTO).zoom
+  let s = 1
+  slots.forEach((slot, i) => {
+    const shot = state.shots[i]
+    if (shot) s = Math.max(s, 1 / (Math.max(slot.w / shot.width, slot.h / shot.height) * zoom))
+  })
+  return Math.min(s, Math.sqrt(MAX_EXPORT_PIXELS / (W * H)), MAX_CANVAS_SIDE / Math.max(W, H))
+}
+
+const jpeg = (c, q) => new Promise((resolve) => c.toBlob(resolve, 'image/jpeg', q))
+
+// full: the photo at camera resolution, for download. preview: a medium copy for screens and sharing.
+export async function renderFinal(state) {
+  const c = document.createElement('canvas')
+  renderComposite(c, state, { scale: exportScale(state), selectedId: null })
+  const [full, preview] = await Promise.all([jpeg(c, 0.92), jpeg(scaledCopy(c, PREVIEW_SIDE), 0.82)])
+  c.width = c.height = 0
+  return { full, preview }
 }
