@@ -177,7 +177,7 @@ const notFound = (home) => `
 <h1>${home ? 'AFAQ Photo Booth' : 'Photo not found'}</h1>
 <p>${home ? 'Scan the QR code at the booth to get your photo.' : 'This link may be wrong, or the photo has expired or was removed. Ask at the booth for a new code.'}</p>`
 
-app.use('/assets', express.static(path.join(__dirname, '..', 'public', 'assets')))
-app.use('/fonts', express.static(path.join(__dirname, '..', 'public', 'fonts')))
+app.use('/assets', express.static(path.join(__dirname, 'public', 'assets')))
+app.use('/fonts', express.static(path.join(__dirname, 'public', 'fonts')))
 
 app.listen(PORT, '0.0.0.0', () => console.log(`AFAQ booth cloud listening on :${PORT}`))

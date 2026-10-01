@@ -3,6 +3,7 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci --omit=dev
 COPY server.js ./
+COPY public ./public
 ENV PORT=8787 DATA_DIR=/data
 VOLUME /data
 EXPOSE 8787
