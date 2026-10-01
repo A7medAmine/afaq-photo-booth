@@ -94,6 +94,8 @@ img { -webkit-user-drag: none; }
   gap: 0 clamp(16px, 3vw, 48px);
 }
 .brand {
+  position: relative;
+  z-index: 2;
   grid-area: brand;
   display: flex;
   align-items: center;
@@ -175,10 +177,19 @@ img { -webkit-user-drag: none; }
   background: rgba(255, 210, 63, 0.9);
   border: 3px solid var(--ink);
 }
-.float { position: absolute; pointer-events: none; filter: drop-shadow(6px 8px 0 rgba(3, 10, 46, 0.35)); }
-.f-car { width: 44%; left: -4%; bottom: 0; transform: rotate(-8deg); animation: drop 0.7s 0.5s cubic-bezier(0.3, 1.5, 0.5, 1) backwards; }
-.f-uno { width: 34%; right: -2%; top: 2%; transform: rotate(14deg); animation: drop 0.7s 0.3s cubic-bezier(0.3, 1.5, 0.5, 1) backwards; }
-.f-bolt { width: 16%; left: 6%; top: 6%; transform: rotate(-14deg); animation: drop 0.7s 0.7s cubic-bezier(0.3, 1.5, 0.5, 1) backwards; }
+.float {
+  position: absolute;
+  pointer-events: none;
+  rotate: var(--rot, 0deg);
+  filter: drop-shadow(6px 8px 0 rgba(3, 10, 46, 0.35));
+  animation:
+    drop 0.7s calc(0.3s + var(--i) * 0.12s) cubic-bezier(0.3, 1.5, 0.5, 1) backwards,
+    bob calc(2.6s + var(--i) * 0.35s) calc(1.2s + var(--i) * 0.2s) ease-in-out infinite alternate;
+}
+@keyframes bob {
+  from { margin-top: 0; rotate: var(--rot, 0deg); }
+  to { margin-top: -16px; rotate: calc(var(--rot, 0deg) + 6deg); }
+}
 @keyframes drop {
   from { opacity: 0; translate: 0 -60px; scale: 1.4; }
   to { opacity: 1; translate: 0 0; scale: 1; }
@@ -842,3 +853,46 @@ html[lang="ar"] .panel-foot .btn.big { font-size: 28px; padding: 10px 14px; }
   box-shadow: 0 4px 0 var(--ink);
 }
 .face-badge.on { background: var(--sun); }
+
+/* ---------- attract: extra motion ---------- */
+.polaroid { animation: sway 5s ease-in-out infinite alternate; }
+@keyframes sway { from { rotate: -1.5deg; } to { rotate: 1.5deg; } }
+.polaroid .tape { animation: tape 3s ease-in-out infinite alternate; }
+@keyframes tape { from { rotate: -2deg; } to { rotate: 3deg; } }
+
+.hero-copy h1 { animation: rise 0.7s cubic-bezier(0.3, 1.4, 0.5, 1) backwards, wobble 3.2s 0.8s ease-in-out infinite alternate; }
+.hero-copy p { animation: rise 0.7s 0.15s ease-out backwards; }
+.start-row .btn { animation: rise 0.6s 0.3s cubic-bezier(0.3, 1.5, 0.5, 1) backwards, pulse 1.8s 1s ease-in-out infinite; position: relative; overflow: hidden; }
+.start-row .btn + .btn { animation-delay: 0.45s, 1.4s; }
+.start-row .btn::after {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 -60%;
+  width: 40%;
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.6), transparent);
+  transform: skewX(-20deg);
+  animation: shine 3.2s 1.5s ease-in-out infinite;
+}
+.start-row .btn + .btn::after { animation-delay: 2.3s; }
+@keyframes rise { from { opacity: 0; translate: 0 30px; } to { opacity: 1; translate: 0 0; } }
+@keyframes wobble { from { text-shadow: 0.06em 0.06em 0 var(--ink); rotate: -0.8deg; } to { text-shadow: 0.09em 0.09em 0 var(--ink); rotate: 0.8deg; } }
+@keyframes pulse { 0%, 100% { scale: 1; } 50% { scale: 1.06; } }
+@keyframes shine { 0% { inset-inline-start: -60%; } 35%, 100% { inset-inline-start: 140%; } }
+
+.brand img { animation: wiggle 2.4s ease-in-out infinite; }
+@keyframes wiggle { 0%, 70%, 100% { rotate: 0deg; } 80% { rotate: -10deg; } 90% { rotate: 10deg; } }
+
+.twinkles { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 0; }
+.twinkles span {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  background: #fff;
+  clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%);
+  opacity: 0;
+  animation: twinkle calc(2.4s + (var(--i) * 0.37s)) calc(var(--i) * -0.6s) ease-in-out infinite;
+}
+@keyframes twinkle {
+  0%, 100% { opacity: 0; scale: 0.3; rotate: 0deg; }
+  50% { opacity: 0.9; scale: 1.3; rotate: 90deg; }
+}

@@ -1,0 +1,792 @@
+[
+ {
+  "id": "f1_car",
+  "group": "objects",
+  "aspect": 1.727
+ },
+ {
+  "id": "back_to_505",
+  "group": "music",
+  "aspect": 1.0
+ },
+ {
+  "id": "weird",
+  "group": "memes",
+  "aspect": 2.626
+ },
+ {
+  "id": "money_bow",
+  "group": "cute",
+  "aspect": 1.085
+ },
+ {
+  "id": "princess",
+  "group": "cute",
+  "aspect": 4.163
+ },
+ {
+  "id": "hg_hot_girl",
+  "group": "cute",
+  "aspect": 1.029
+ },
+ {
+  "id": "cat_shocked",
+  "group": "cats",
+  "aspect": 1.056
+ },
+ {
+  "id": "grad_cap_silhouette",
+  "group": "cute",
+  "aspect": 0.923
+ },
+ {
+  "id": "hello_kitty_graduate",
+  "group": "cute",
+  "aspect": 0.861
+ },
+ {
+  "id": "swans",
+  "group": "cute",
+  "aspect": 2.738
+ },
+ {
+  "id": "limited_edition",
+  "group": "memes",
+  "aspect": 1.803
+ },
+ {
+  "id": "cat_question",
+  "group": "cats",
+  "aspect": 0.885
+ },
+ {
+  "id": "warning_do_not_touch",
+  "group": "memes",
+  "aspect": 1.829
+ },
+ {
+  "id": "billie_figure",
+  "group": "music",
+  "aspect": 0.496
+ },
+ {
+  "id": "505",
+  "group": "music",
+  "aspect": 1.939
+ },
+ {
+  "id": "arctic_monkeys",
+  "group": "music",
+  "aspect": 1.759
+ },
+ {
+  "id": "cat_screaming",
+  "group": "cats",
+  "aspect": 0.945
+ },
+ {
+  "id": "chase_atlantic_box",
+  "group": "music",
+  "aspect": 3.012
+ },
+ {
+  "id": "chase_atlantic_rose",
+  "group": "music",
+  "aspect": 1.13
+ },
+ {
+  "id": "the_weeknd",
+  "group": "music",
+  "aspect": 0.758
+ },
+ {
+  "id": "drake_no",
+  "group": "memes",
+  "aspect": 1.249
+ },
+ {
+  "id": "will_smith_pose",
+  "group": "memes",
+  "aspect": 0.685
+ },
+ {
+  "id": "spiderverse_hanging",
+  "group": "memes",
+  "aspect": 1.106
+ },
+ {
+  "id": "zzz",
+  "group": "objects",
+  "aspect": 1.244
+ },
+ {
+  "id": "teddy_bear",
+  "group": "cute",
+  "aspect": 0.914
+ },
+ {
+  "id": "white_chicks",
+  "group": "memes",
+  "aspect": 1.225
+ },
+ {
+  "id": "gumball_nicolas",
+  "group": "memes",
+  "aspect": 1.153
+ },
+ {
+  "id": "anime_hands_on_face",
+  "group": "memes",
+  "aspect": 1.034
+ },
+ {
+  "id": "gavin_kid",
+  "group": "memes",
+  "aspect": 0.949
+ },
+ {
+  "id": "jake_reading",
+  "group": "memes",
+  "aspect": 1.681
+ },
+ {
+  "id": "squidward_papers",
+  "group": "memes",
+  "aspect": 1.22
+ },
+ {
+  "id": "be_positive_proton",
+  "group": "memes",
+  "aspect": 0.852
+ },
+ {
+  "id": "peace_hand",
+  "group": "objects",
+  "aspect": 0.639
+ },
+ {
+  "id": "makeup_palette",
+  "group": "cute",
+  "aspect": 1.082
+ },
+ {
+  "id": "i_know_bas_bastaabat",
+  "group": "arabic",
+  "aspect": 1.193
+ },
+ {
+  "id": "deal_with_it_glasses",
+  "group": "objects",
+  "aspect": 5.172
+ },
+ {
+  "id": "dont_be_racist_arabic",
+  "group": "arabic",
+  "aspect": 1.662
+ },
+ {
+  "id": "beard",
+  "group": "objects",
+  "aspect": 0.742
+ },
+ {
+  "id": "drama_toggle",
+  "group": "memes",
+  "aspect": 2.599
+ },
+ {
+  "id": "tfou",
+  "group": "arabic",
+  "aspect": 0.842
+ },
+ {
+  "id": "nerd_alert",
+  "group": "memes",
+  "aspect": 1.11
+ },
+ {
+  "id": "come_along_with_me",
+  "group": "cute",
+  "aspect": 1.889
+ },
+ {
+  "id": "unacceptable",
+  "group": "memes",
+  "aspect": 1.33
+ },
+ {
+  "id": "i_bee_leaf_in_you",
+  "group": "cute",
+  "aspect": 2.909
+ },
+ {
+  "id": "cat_omg",
+  "group": "cats",
+  "aspect": 0.896
+ },
+ {
+  "id": "skeleton_thumbs",
+  "group": "memes",
+  "aspect": 0.883
+ },
+ {
+  "id": "blurry_girl_bow",
+  "group": "memes",
+  "aspect": 1.014
+ },
+ {
+  "id": "girl_explosion",
+  "group": "memes",
+  "aspect": 0.998
+ },
+ {
+  "id": "girl_biting_finger",
+  "group": "memes",
+  "aspect": 0.98
+ },
+ {
+  "id": "praying_girls",
+  "group": "memes",
+  "aspect": 1.004
+ },
+ {
+  "id": "delete_it",
+  "group": "memes",
+  "aspect": 0.961
+ },
+ {
+  "id": "shocked_girl",
+  "group": "memes",
+  "aspect": 1.062
+ },
+ {
+  "id": "detective_conan_arabic",
+  "group": "arabic",
+  "aspect": 1.205
+ },
+ {
+  "id": "red_dress_explosion_arabic",
+  "group": "arabic",
+  "aspect": 1.045
+ },
+ {
+  "id": "anime_goggles",
+  "group": "memes",
+  "aspect": 0.867
+ },
+ {
+  "id": "spiderman_jump",
+  "group": "memes",
+  "aspect": 1.135
+ },
+ {
+  "id": "dog_side_eye",
+  "group": "memes",
+  "aspect": 0.791
+ },
+ {
+  "id": "panda",
+  "group": "cute",
+  "aspect": 1.237
+ },
+ {
+  "id": "claw_clip",
+  "group": "cute",
+  "aspect": 1.533
+ },
+ {
+  "id": "mustache_a",
+  "group": "objects",
+  "aspect": 2.723
+ },
+ {
+  "id": "oops_girl",
+  "group": "memes",
+  "aspect": 0.861
+ },
+ {
+  "id": "kawaii_girl",
+  "group": "cute",
+  "aspect": 1.03
+ },
+ {
+  "id": "mustache_b",
+  "group": "objects",
+  "aspect": 3.325
+ },
+ {
+  "id": "exclamation_marks",
+  "group": "objects",
+  "aspect": 0.955
+ },
+ {
+  "id": "hello_kitty",
+  "group": "cute",
+  "aspect": 1.38
+ },
+ {
+  "id": "we_bare_bears",
+  "group": "cute",
+  "aspect": 0.803
+ },
+ {
+  "id": "cat_coffee",
+  "group": "cats",
+  "aspect": 0.912
+ },
+ {
+  "id": "cat_thumbs_up",
+  "group": "cats",
+  "aspect": 1.125
+ },
+ {
+  "id": "iced_coffee",
+  "group": "cute",
+  "aspect": 0.553
+ },
+ {
+  "id": "cherries",
+  "group": "cute",
+  "aspect": 0.9
+ },
+ {
+  "id": "red_bow",
+  "group": "cute",
+  "aspect": 0.819
+ },
+ {
+  "id": "dollars",
+  "group": "objects",
+  "aspect": 1.32
+ },
+ {
+  "id": "pink_bow",
+  "group": "cute",
+  "aspect": 1.106
+ },
+ {
+  "id": "clapperboard",
+  "group": "objects",
+  "aspect": 1.069
+ },
+ {
+  "id": "bmo",
+  "group": "objects",
+  "aspect": 1.077
+ },
+ {
+  "id": "checkered_flags",
+  "group": "objects",
+  "aspect": 1.801
+ },
+ {
+  "id": "duck_sunglasses",
+  "group": "cute",
+  "aspect": 0.658
+ },
+ {
+  "id": "camera",
+  "group": "objects",
+  "aspect": 1.798
+ },
+ {
+  "id": "neymar",
+  "group": "memes",
+  "aspect": 1.058
+ },
+ {
+  "id": "pointing_hand",
+  "group": "objects",
+  "aspect": 1.607
+ },
+ {
+  "id": "matcha",
+  "group": "cute",
+  "aspect": 0.486
+ },
+ {
+  "id": "cat_sunglasses",
+  "group": "cats",
+  "aspect": 1.041
+ },
+ {
+  "id": "aliens",
+  "group": "memes",
+  "aspect": 1.225
+ },
+ {
+  "id": "plus_1000_aura",
+  "group": "memes",
+  "aspect": 1.684
+ },
+ {
+  "id": "cat_angry",
+  "group": "cats",
+  "aspect": 0.924
+ },
+ {
+  "id": "smiley",
+  "group": "objects",
+  "aspect": 1.002
+ },
+ {
+  "id": "back_to_back",
+  "group": "memes",
+  "aspect": 0.962
+ },
+ {
+  "id": "born_to_make_history",
+  "group": "memes",
+  "aspect": 1.002
+ },
+ {
+  "id": "cat_grumpy",
+  "group": "cats",
+  "aspect": 1.309
+ },
+ {
+  "id": "blush_compact",
+  "group": "cute",
+  "aspect": 0.854
+ },
+ {
+  "id": "clown",
+  "group": "memes",
+  "aspect": 1.151
+ },
+ {
+  "id": "cat_sunglasses_thumbs",
+  "group": "cats",
+  "aspect": 1.02
+ },
+ {
+  "id": "dog_and_cat",
+  "group": "cats",
+  "aspect": 1.102
+ },
+ {
+  "id": "dog_sunglasses",
+  "group": "cute",
+  "aspect": 0.79
+ },
+ {
+  "id": "sparkles",
+  "group": "cute",
+  "aspect": 1.024
+ },
+ {
+  "id": "spiderweb_heart",
+  "group": "cute",
+  "aspect": 1.016
+ },
+ {
+  "id": "cat_sunglasses_small",
+  "group": "cats",
+  "aspect": 1.094
+ },
+ {
+  "id": "hug_sketch",
+  "group": "memes",
+  "aspect": 1.273
+ },
+ {
+  "id": "iconic",
+  "group": "memes",
+  "aspect": 2.688
+ },
+ {
+  "id": "ignored",
+  "group": "memes",
+  "aspect": 1.779
+ },
+ {
+  "id": "kylie",
+  "group": "memes",
+  "aspect": 1.305
+ },
+ {
+  "id": "man",
+  "group": "memes",
+  "aspect": 0.422
+ },
+ {
+  "id": "monkeys",
+  "group": "memes",
+  "aspect": 1.008
+ },
+ {
+  "id": "pony",
+  "group": "cute",
+  "aspect": 0.737
+ },
+ {
+  "id": "possums",
+  "group": "memes",
+  "aspect": 1.044
+ },
+ {
+  "id": "slay",
+  "group": "memes",
+  "aspect": 1.36
+ },
+ {
+  "id": "spiderman",
+  "group": "memes",
+  "aspect": 1.122
+ },
+ {
+  "id": "spongebob",
+  "group": "memes",
+  "aspect": 1.265
+ },
+ {
+  "id": "unicorn",
+  "group": "cute",
+  "aspect": 0.877
+ },
+ {
+  "id": "wtf",
+  "group": "memes",
+  "aspect": 1.865
+ },
+ {
+  "id": "need_more_coffee",
+  "group": "objects",
+  "aspect": 1.125
+ },
+ {
+  "id": "meditating_book",
+  "group": "cute",
+  "aspect": 0.773
+ },
+ {
+  "id": "cute_blush_guy",
+  "group": "memes",
+  "aspect": 0.776
+ },
+ {
+  "id": "miffy",
+  "group": "cute",
+  "aspect": 0.694
+ },
+ {
+  "id": "pink_ribbon",
+  "group": "cute",
+  "aspect": 1.712
+ },
+ {
+  "id": "sad_kid",
+  "group": "memes",
+  "aspect": 1.03
+ },
+ {
+  "id": "disco_ball",
+  "group": "objects",
+  "aspect": 1.103
+ },
+ {
+  "id": "white_flower",
+  "group": "cute",
+  "aspect": 0.973
+ },
+ {
+  "id": "dollar_fan",
+  "group": "objects",
+  "aspect": 1.293
+ },
+ {
+  "id": "vintage_camera",
+  "group": "objects",
+  "aspect": 1.58
+ },
+ {
+  "id": "iconic_text",
+  "group": "memes",
+  "aspect": 3.793
+ },
+ {
+  "id": "year_2026",
+  "group": "memes",
+  "aspect": 2.065
+ },
+ {
+  "id": "glitter_star",
+  "group": "cute",
+  "aspect": 1.021
+ },
+ {
+  "id": "monster_scream",
+  "group": "memes",
+  "aspect": 1.118
+ },
+ {
+  "id": "grad_cap_diploma",
+  "group": "objects",
+  "aspect": 1.312
+ },
+ {
+  "id": "clover_seal",
+  "group": "cute",
+  "aspect": 1.004
+ },
+ {
+  "id": "cake",
+  "group": "cute",
+  "aspect": 0.771
+ },
+ {
+  "id": "dog_coffee",
+  "group": "cute",
+  "aspect": 0.875
+ },
+ {
+  "id": "hamster_thank_you",
+  "group": "cute",
+  "aspect": 1.039
+ },
+ {
+  "id": "cat_heart_paws",
+  "group": "cats",
+  "aspect": 1.06
+ },
+ {
+  "id": "grad_cat",
+  "group": "cats",
+  "aspect": 0.953
+ },
+ {
+  "id": "delulu",
+  "group": "memes",
+  "aspect": 1.188
+ },
+ {
+  "id": "teddy_brown",
+  "group": "cute",
+  "aspect": 0.863
+ },
+ {
+  "id": "university_text",
+  "group": "memes",
+  "aspect": 2.516
+ },
+ {
+  "id": "lucky_777",
+  "group": "objects",
+  "aspect": 1.954
+ },
+ {
+  "id": "corgi_smirk",
+  "group": "cute",
+  "aspect": 0.954
+ },
+ {
+  "id": "lucky_me",
+  "group": "cute",
+  "aspect": 1.096
+ },
+ {
+  "id": "ask_chatgpt",
+  "group": "memes",
+  "aspect": 1.418
+ },
+ {
+  "id": "film_strip",
+  "group": "objects",
+  "aspect": 0.383
+ },
+ {
+  "id": "birthday_bubble",
+  "group": "memes",
+  "aspect": 4.414
+ },
+ {
+  "id": "mushroom_girl",
+  "group": "memes",
+  "aspect": 0.66
+ },
+ {
+  "id": "gargamel",
+  "group": "memes",
+  "aspect": 0.696
+ },
+ {
+  "id": "green_kid",
+  "group": "memes",
+  "aspect": 0.826
+ },
+ {
+  "id": "pink_hood_man",
+  "group": "memes",
+  "aspect": 0.629
+ },
+ {
+  "id": "lion_hands_hip",
+  "group": "memes",
+  "aspect": 0.955
+ },
+ {
+  "id": "nick_fox",
+  "group": "memes",
+  "aspect": 0.68
+ },
+ {
+  "id": "saudi_man",
+  "group": "arabic",
+  "aspect": 0.588
+ },
+ {
+  "id": "confused_woman",
+  "group": "memes",
+  "aspect": 0.864
+ },
+ {
+  "id": "strawberry_face",
+  "group": "memes",
+  "aspect": 0.873
+ },
+ {
+  "id": "banana_face",
+  "group": "memes",
+  "aspect": 0.52
+ },
+ {
+  "id": "minion_face",
+  "group": "memes",
+  "aspect": 0.578
+ },
+ {
+  "id": "rat_face",
+  "group": "memes",
+  "aspect": 1.18
+ },
+ {
+  "id": "chicken_face",
+  "group": "memes",
+  "aspect": 0.588
+ },
+ {
+  "id": "happy_meal_face",
+  "group": "memes",
+  "aspect": 0.934
+ },
+ {
+  "id": "blue_mouse",
+  "group": "cute",
+  "aspect": 1.049
+ },
+ {
+  "id": "gargamel_peace",
+  "group": "memes",
+  "aspect": 1.299
+ },
+ {
+  "id": "green_lizard",
+  "group": "memes",
+  "aspect": 0.863
+ },
+ {
+  "id": "kiwi_face",
+  "group": "memes",
+  "aspect": 0.922
+ }
+]

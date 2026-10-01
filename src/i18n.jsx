@@ -149,6 +149,12 @@ const en = {
   'group.faces': 'Faces',
   'group.fun': 'Fun',
   'group.tech': 'Tech',
+  'group.cats': 'Cats',
+  'group.memes': 'Memes',
+  'group.music': 'Music',
+  'group.cute': 'Cute',
+  'group.arabic': 'Arabic',
+  'group.objects': 'Objects',
 }
 
 const fr = {
@@ -292,6 +298,12 @@ const fr = {
   'group.faces': 'Visages',
   'group.fun': 'Fun',
   'group.tech': 'Tech',
+  'group.cats': 'Chats',
+  'group.memes': 'Mèmes',
+  'group.music': 'Musique',
+  'group.cute': 'Mignon',
+  'group.arabic': 'Arabe',
+  'group.objects': 'Objets',
 }
 
 const ar = {
@@ -435,6 +447,12 @@ const ar = {
   'group.faces': 'وجوه',
   'group.fun': 'مرح',
   'group.tech': 'تقنية',
+  'group.cats': 'قطط',
+  'group.memes': 'ميمز',
+  'group.music': 'موسيقى',
+  'group.cute': 'لطيف',
+  'group.arabic': 'عربي',
+  'group.objects': 'أشياء',
 }
 
 const DICTS = { en, fr, ar }

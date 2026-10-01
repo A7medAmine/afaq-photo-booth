@@ -44,6 +44,7 @@ export const FACE_STICKERS = [
   { id: 'f-cap', anchor: 'top', src: '/assets/emoji/1f9e2.png', width: 1.15 },
   { id: 'f-bow', anchor: 'top', src: '/assets/emoji/1f380.png', width: 0.7 },
   { id: 'f-glasses', anchor: 'eyes', src: '/assets/emoji/1f453.png', width: 1.45 },
+  { id: 'f-deal-with-it', anchor: 'eyes', src: '/assets/stickers/deal_with_it_glasses.webp', width: 1.5 },
   { id: 'f-shades', anchor: 'eyes', src: '/assets/emoji/1f576-fe0f.png', width: 1.45 },
   { id: 'f-blush', anchor: 'cheeks', src: blush(345), width: 0.42, flat: true },
   { id: 'f-blush-peach', anchor: 'cheeks', src: blush(18), width: 0.42, flat: true },
@@ -51,6 +52,9 @@ export const FACE_STICKERS = [
   { id: 'f-star', anchor: 'cheeks', src: '/assets/emoji/2b50.png', width: 0.2 },
   { id: 'f-freckles', anchor: 'freckles', src: freckles, width: 0.8, flat: true },
   { id: 'f-clown', anchor: 'nose', src: clownNose, width: 0.2 },
+  { id: 'f-mustache', anchor: 'mustache', src: '/assets/stickers/mustache_a.webp', width: 0.5 },
+  { id: 'f-mustache-b', anchor: 'mustache', src: '/assets/stickers/mustache_b.webp', width: 0.5 },
+  { id: 'f-beard', anchor: 'beard', src: '/assets/stickers/beard.webp', width: 0.95 },
 ]
 
 const MAX_FACES = 12
@@ -90,6 +94,8 @@ function toFace(lm, w, h, ox = 0, oy = 0) {
     forehead: p(10),
     chin: p(152),
     nose: p(1),
+    mustache: mid(p(2), p(0)),
+    mouth: mid(p(0), p(17)),
     cheeks: [p(50), p(280)],
     width: dist(p(234), p(454)),
   }
@@ -170,6 +176,12 @@ export function placeOnFace(item, face, shot, slot, photo, layout, aspect = 1, p
   if (item.anchor === 'top') ({ x, y } = lift(at(face.forehead), w * aspect * 0.4))
   else if (item.anchor === 'cheeks') ({ x, y } = at(face.cheeks[part]))
   else if (item.anchor === 'nose') ({ x, y } = at(face.nose))
-  else if (item.anchor === 'freckles') ({ x, y } = lift(at(face.nose), w * aspect * 0.15))
+  else if (item.anchor === 'mustache') ({ x, y } = at(face.mustache))
+  else if (item.anchor === 'beard') {
+    // Hang the beard from the mouth: its top edge sits at the lips, the bulk covers the chin.
+    const m = at(face.mouth)
+    const c = at(face.chin)
+    ;({ x, y } = { x: (m.x + c.x) / 2 - up.x * w * aspect * 0.12, y: (m.y + c.y) / 2 - up.y * w * aspect * 0.12 })
+  } else if (item.anchor === 'freckles') ({ x, y } = lift(at(face.nose), w * aspect * 0.15))
   return { x: x / layout.W, y: y / layout.H, size: w / layout.W, rot: face.roll }
 }

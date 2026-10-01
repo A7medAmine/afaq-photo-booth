@@ -1,4 +1,5 @@
 import { formatDate, translate } from './i18n.jsx'
+import stickerCatalog from './stickerCatalog.json'
 import { OPEN_SHAPES, shapePath } from './shapes.js'
 
 export const LAYOUTS = {
@@ -205,19 +206,26 @@ const EMOJI_GROUPS = {
   tech: ['26a1', '1f680', '1f527', '1f4a1', '1f525'],
 }
 
+// Face-only art lives in FACE_STICKERS, so it is left out of the free-placement list.
+const FACE_ONLY = new Set(['mustache_a', 'mustache_b', 'beard', 'deal_with_it_glasses'])
+const PACK = stickerCatalog
+  .filter((s) => !FACE_ONLY.has(s.id))
+  .map((s) => ({
+    id: `p-${s.id}`,
+    kind: 'img',
+    group: s.group,
+    src: `/assets/stickers/${s.id}.webp`,
+    size: Math.min(0.5, Math.max(0.22, 0.34 * Math.sqrt(s.aspect))),
+  }))
+
 export const STICKERS = [
   club({ id: 'robocar', src: '/assets/robocar-removed-bg.webp', size: 0.49 }),
-  club({ id: 'uno', src: '/assets/uno.webp', size: 0.44 }),
-  club({ id: 'pi', src: '/assets/pi-removed-bg.webp', size: 0.42 }),
-  club({ id: 'esp32', src: '/assets/esp32-removed-bg.webp', size: 0.39 }),
-  club({ id: 'led', src: '/assets/led-removed-bg.webp', size: 0.26 }),
   club({ id: 'bolt', src: '/assets/bolt.webp', size: 0.29 }),
-  club({ id: 'screwdriver', src: '/assets/screwdriver.webp', size: 0.44 }),
-  club({ id: 'bord', src: '/assets/bord.webp', size: 0.44 }),
   club({ id: 'logo', src: '/assets/main.webp', size: 0.29, round: true }),
   ...Object.entries(EMOJI_GROUPS).flatMap(([group, codes]) =>
     codes.map((c) => ({ id: `e-${c}`, kind: 'img', group, src: `/assets/emoji/${c}.png`, size: 0.2 })),
   ),
+  ...PACK,
 ]
 
 export const BUBBLE_COLORS = ['#ffd23f', '#2ee6a6', '#ff5fa2', '#3ca2fa', '#ffffff', '#ffd23f', '#ff5fa2']

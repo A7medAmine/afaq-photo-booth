@@ -24,7 +24,7 @@ import { OPEN_SHAPES, SHAPES } from '../shapes.js'
 import { BUBBLE_TEXT, useI18n } from '../i18n.jsx'
 
 const TABS = [['Frames', 'edit.frames'], ['Filters', 'edit.filters'], ['Stickers', 'edit.stickers'], ['Face', 'edit.face'], ['Draw', 'edit.draw'], ['Text', 'edit.text'], ['Photo', 'edit.photo']]
-const DEFAULT_GROUP_NAMES = { mine: 'Mine', club: 'Club', faces: 'Faces', fun: 'Fun', tech: 'Tech' }
+const DEFAULT_GROUP_NAMES = { mine: 'Mine', club: 'Club', faces: 'Faces', fun: 'Fun', tech: 'Tech', cats: 'Cats', memes: 'Memes', music: 'Music', cute: 'Cute', arabic: 'Arabic', objects: 'Objects' }
 const INK_COLORS = ['#030a2e', '#ffffff', '#ff5fa2', '#ffd23f', '#2ee6a6', '#3ca2fa', '#2460e7', '#ff8a3d']
 const INK_SIZES = [8, 18, 36]
 const TEXT_COLORS = ['#ffd23f', '#ff5fa2', '#2ee6a6', '#3ca2fa', '#ffffff', '#ff8a3d']

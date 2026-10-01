@@ -40,7 +40,7 @@ async function toSticker(rec) {
   return { id: rec.id, kind: 'img', src, size: 0.4, custom: true, ...(rec.anchor && { anchor: rec.anchor, width: FACE_WIDTH[rec.anchor] }) }
 }
 
-const FACE_WIDTH = { top: 1.05, eyes: 1.45, cheeks: 0.3, nose: 0.2, freckles: 0.8 }
+const FACE_WIDTH = { top: 1.05, eyes: 1.45, cheeks: 0.3, nose: 0.2, freckles: 0.8, mustache: 0.5, beard: 0.95 }
 const HIDDEN_KEY = 'afaq-hidden-stickers'
 const GROUPS_KEY = 'afaq-sticker-groups'
 
@@ -50,6 +50,12 @@ export const DEFAULT_GROUPS = [
   { id: 'faces', name: 'Faces' },
   { id: 'fun', name: 'Fun' },
   { id: 'tech', name: 'Tech' },
+  { id: 'cats', name: 'Cats' },
+  { id: 'memes', name: 'Memes' },
+  { id: 'music', name: 'Music' },
+  { id: 'cute', name: 'Cute' },
+  { id: 'arabic', name: 'Arabic' },
+  { id: 'objects', name: 'Objects' },
 ]
 
 export const groupOf = (s, assign) => assign[s.id] ?? s.group ?? 'mine'
@@ -76,7 +82,10 @@ function loadHidden() {
 
 function loadGroups() {
   const v = load(GROUPS_KEY, null)
-  return v && Array.isArray(v.groups) ? { groups: v.groups, assign: v.assign || {} } : { groups: DEFAULT_GROUPS, assign: {} }
+  if (!(v && Array.isArray(v.groups))) return { groups: DEFAULT_GROUPS, assign: {} }
+  // Saved lists predate newer built-in groups, so add any that are missing.
+  const missing = DEFAULT_GROUPS.filter((d) => !v.groups.some((g) => g.id === d.id))
+  return { groups: [...v.groups, ...missing], assign: v.assign || {} }
 }
 
 export function useCustomStickers() {

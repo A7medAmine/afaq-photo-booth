@@ -78,8 +78,8 @@ export default function Crop({ shot, slot, photo, onCancel, onDone }) {
       setBox((b) => place(p.x - d.dx, p.y - d.dy, b.w))
       return
     }
-    const roomX = d.sx < 0 ? shot.width - d.ax : d.ax
-    const roomY = d.sy < 0 ? shot.height - d.ay : d.ay
+    const roomX = d.sx > 0 ? shot.width - d.ax : d.ax
+    const roomY = d.sy > 0 ? shot.height - d.ay : d.ay
     const want = Math.max((p.x - d.ax) * d.sx, (p.y - d.ay) * d.sy * aspect)
     const w = clamp(want, minW, Math.min(maxW, roomX, roomY * aspect))
     setBox({ w, h: w / aspect, cx: d.ax + (d.sx * w) / 2, cy: d.ay + (d.sy * w) / aspect / 2 })

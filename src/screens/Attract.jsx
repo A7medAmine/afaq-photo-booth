@@ -237,7 +237,7 @@ function Settings({ cam, custom, onClose, onTestFiles }) {
         <div className="field">
           Face stickers
           <span className="note">These land on faces by themselves. Use a transparent PNG cropped tight around the hat or glasses, facing the camera. Tap a built-in one to hide or show it.</span>
-          {[['top', 'On the head (hats, crowns)'], ['eyes', 'On the eyes (glasses)'], ['cheeks', 'On the cheeks (blush, hearts; one per cheek)'], ['nose', 'On the nose'], ['freckles', 'Across nose and cheeks (freckles)']].map(([anchor, title]) => (
+          {[['top', 'On the head (hats, crowns)'], ['eyes', 'On the eyes (glasses)'], ['cheeks', 'On the cheeks (blush, hearts; one per cheek)'], ['nose', 'On the nose'], ['freckles', 'Across nose and cheeks (freckles)'], ['mustache', 'Under the nose (mustaches)'], ['beard', 'On the chin (beards)']].map(([anchor, title]) => (
             <div className="folder" key={anchor}>
               <div className="folder-head">
                 <strong>{title}</strong>
@@ -298,6 +298,19 @@ function Settings({ cam, custom, onClose, onTestFiles }) {
   )
 }
 
+// [sticker, { width, position, tilt, delay }] — each one drops in, then bobs forever.
+const pos = (width, place, rot, i) => ({ width: `${width}%`, ...place, '--rot': `${rot}deg`, '--i': i })
+const FLOATERS = [
+  ['cat_sunglasses_thumbs', pos(30, { right: '-3%', top: '0%' }, 12, 0)],
+  ['spiderman_jump', pos(38, { left: '-6%', bottom: '2%' }, -8, 1)],
+  ['sparkles', pos(15, { left: '4%', top: '4%' }, -14, 2)],
+  ['unicorn', pos(22, { right: '-1%', bottom: '4%' }, 8, 3)],
+  ['cherries', pos(16, { left: '-8%', top: '34%' }, -12, 4)],
+  ['hello_kitty', pos(20, { right: '-7%', top: '38%' }, 10, 5)],
+  ['duck_sunglasses', pos(16, { left: '30%', bottom: '-5%' }, 6, 6)],
+  ['plus_1000_aura', pos(22, { left: '34%', top: '0%' }, -5, 7)],
+]
+
 export default function Attract({ cam, custom, onStart, onTestPhotos }) {
   const [stage, setStage] = useState(null)
   const { t, lang, setLang } = useI18n()
@@ -314,6 +327,10 @@ export default function Attract({ cam, custom, onStart, onTestPhotos }) {
     <main
       className="screen attract"
     >
+      <div className="twinkles" aria-hidden="true">
+        {Array.from({ length: 14 }, (_, i) => <span key={i} style={{ '--i': i, left: `${(i * 37 + 8) % 97}%`, top: `${(i * 53 + 11) % 91}%` }} />)}
+      </div>
+
       <header className="brand">
         <img src="/assets/main.webp" alt="" />
         <span>{t('brand')}</span>
@@ -337,14 +354,14 @@ export default function Attract({ cam, custom, onStart, onTestPhotos }) {
       </section>
 
       <section className="hero-visual" aria-hidden="true">
-        <img className="float f-uno" src="/assets/uno.webp" alt="" />
+        {FLOATERS.map(([name, pos]) => (
+          <img key={name} className="float" style={pos} src={`/assets/stickers/${name}.webp`} alt="" />
+        ))}
         <div className="polaroid">
           <span className="tape" />
           <VideoView stream={cam.stream} mirror={cam.settings.mirror} className="live" />
           <div className="polaroid-cap">{t('attract.live')}</div>
         </div>
-        <img className="float f-car" src="/assets/robocar-removed-bg.webp" alt="" />
-        <img className="float f-bolt" src="/assets/bolt.webp" alt="" />
       </section>
 
       <button className="gear" aria-label={t('attract.settings')} onClick={() => setStage('pin')}>
