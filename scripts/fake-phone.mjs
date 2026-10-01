@@ -27,7 +27,7 @@ const cors = {
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type',
 }
-const health = { ok: true, camera: 'back', width: 1280, height: 720, stillWidth: 4032, stillHeight: 3024 }
+const health = { ok: true, camera: 'back', width: 1280, height: 720, stillWidth: 4032, stillHeight: 3024, battery: 76, charging: true }
 
 http
   .createServer((req, res) => {

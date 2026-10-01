@@ -79,6 +79,29 @@ function rng(seed) {
   }
 }
 
+function starPath(ctx, cx, cy, R, inner, rot) {
+  ctx.beginPath()
+  for (let i = 0; i < 10; i++) {
+    const rad = i % 2 ? R * inner : R
+    const a = rot + (i * Math.PI) / 5 - Math.PI / 2
+    const px = cx + Math.cos(a) * rad
+    const py = cy + Math.sin(a) * rad
+    if (i === 0) ctx.moveTo(px, py)
+    else ctx.lineTo(px, py)
+  }
+  ctx.closePath()
+  ctx.fill()
+}
+
+function heartPath(ctx, cx, cy, s) {
+  ctx.beginPath()
+  ctx.moveTo(cx, cy + s * 0.9)
+  ctx.bezierCurveTo(cx - s * 1.6, cy - s * 0.1, cx - s * 0.9, cy - s * 1.2, cx, cy - s * 0.4)
+  ctx.bezierCurveTo(cx + s * 0.9, cy - s * 1.2, cx + s * 1.6, cy - s * 0.1, cx, cy + s * 0.9)
+  ctx.closePath()
+  ctx.fill()
+}
+
 export const FRAMES = [
   {
     id: 'circuit',
@@ -197,6 +220,207 @@ export const FRAMES = [
       ctx.fillRect(0, 0, W, H)
     },
   },
+  {
+    id: 'galaxy',
+    name: 'Galaxy',
+    ink: '#ffffff',
+    border: '#ffffff',
+    bg(ctx, W, H) {
+      const r = rng(33)
+      const g = ctx.createLinearGradient(0, 0, W, H)
+      g.addColorStop(0, '#0b0630')
+      g.addColorStop(0.55, '#2a1170')
+      g.addColorStop(1, '#6a1b9a')
+      ctx.fillStyle = g
+      ctx.fillRect(0, 0, W, H)
+      for (let i = 0; i < 4; i++) {
+        const x = r() * W
+        const y = r() * H
+        const rad = 200 + r() * 260
+        const n = ctx.createRadialGradient(x, y, 0, x, y, rad)
+        n.addColorStop(0, i % 2 ? 'rgba(255,95,162,.28)' : 'rgba(60,162,250,.28)')
+        n.addColorStop(1, 'rgba(0,0,0,0)')
+        ctx.fillStyle = n
+        ctx.fillRect(0, 0, W, H)
+      }
+      ctx.fillStyle = '#ffffff'
+      for (let i = 0; i < 160; i++) {
+        ctx.globalAlpha = 0.35 + r() * 0.65
+        ctx.beginPath()
+        ctx.arc(r() * W, r() * H, 1.5 + r() * 3.5, 0, Math.PI * 2)
+        ctx.fill()
+      }
+      ctx.globalAlpha = 1
+      ctx.fillStyle = '#ffd23f'
+      for (let i = 0; i < 14; i++) starPath(ctx, r() * W, r() * H, 10 + r() * 14, 0.45, r() * 1.2)
+    },
+  },
+  {
+    id: 'candy',
+    name: 'Candy',
+    ink: INK,
+    border: '#ffffff',
+    bg(ctx, W, H) {
+      ctx.fillStyle = '#fff1f7'
+      ctx.fillRect(0, 0, W, H)
+      ctx.save()
+      ctx.rotate(Math.PI / 4)
+      const d = Math.hypot(W, H)
+      const cols = ['#ff5fa2', '#ffffff', '#3ca2fa', '#ffffff']
+      for (let i = 0, x = -d; x < d; i++, x += 46) {
+        ctx.fillStyle = cols[i % 4]
+        ctx.fillRect(x, -d, 46, d * 2)
+      }
+      ctx.restore()
+    },
+  },
+  {
+    id: 'hearts',
+    name: 'Hearts',
+    ink: '#ffffff',
+    border: '#ffffff',
+    bg(ctx, W, H) {
+      const r = rng(11)
+      ctx.fillStyle = '#d6246e'
+      ctx.fillRect(0, 0, W, H)
+      const cols = ['#ff5fa2', '#ff9ec7', '#ffffff', '#ff3d81']
+      const step = 110
+      for (let row = 0, y = 0; y < H + step; row++, y += step) {
+        for (let x = (row % 2) * (step / 2); x < W + step; x += step) {
+          ctx.fillStyle = cols[Math.floor(r() * cols.length)]
+          ctx.globalAlpha = 0.8
+          heartPath(ctx, x, y, 22 + r() * 10)
+        }
+      }
+      ctx.globalAlpha = 1
+    },
+  },
+  {
+    id: 'checker',
+    name: 'Checker',
+    ink: INK,
+    border: '#ffffff',
+    bg(ctx, W, H) {
+      const s = 70
+      for (let y = 0, j = 0; y < H; y += s, j++) {
+        for (let x = 0, i = 0; x < W; x += s, i++) {
+          ctx.fillStyle = (i + j) % 2 ? '#ffd23f' : '#ffffff'
+          ctx.fillRect(x, y, s, s)
+        }
+      }
+    },
+  },
+  {
+    id: 'sunset',
+    name: 'Sunset',
+    ink: '#ffffff',
+    border: '#ffffff',
+    bg(ctx, W, H) {
+      const g = ctx.createLinearGradient(0, 0, 0, H)
+      g.addColorStop(0, '#ffb347')
+      g.addColorStop(0.45, '#ff5f6d')
+      g.addColorStop(1, '#7b2ff7')
+      ctx.fillStyle = g
+      ctx.fillRect(0, 0, W, H)
+      ctx.fillStyle = 'rgba(255,255,255,.14)'
+      for (let i = 0; i < 6; i++) {
+        ctx.beginPath()
+        ctx.arc(W * (0.1 + i * 0.18), H * (0.2 + (i % 3) * 0.3), 120 + (i % 2) * 70, 0, Math.PI * 2)
+        ctx.fill()
+      }
+    },
+  },
+  {
+    id: 'waves',
+    name: 'Waves',
+    ink: '#ffffff',
+    border: '#ffffff',
+    bg(ctx, W, H) {
+      ctx.fillStyle = '#1a6fe0'
+      ctx.fillRect(0, 0, W, H)
+      const cols = ['#3ca2fa', '#5db7ff', '#2460e7']
+      ctx.lineWidth = 16
+      ctx.lineCap = 'round'
+      for (let y = 0, row = 0; y < H + 60; y += 60, row++) {
+        ctx.strokeStyle = cols[row % 3]
+        ctx.beginPath()
+        for (let x = -20; x <= W + 20; x += 10) {
+          const yy = y + Math.sin(x / 55 + row) * 18
+          if (x === -20) ctx.moveTo(x, yy)
+          else ctx.lineTo(x, yy)
+        }
+        ctx.stroke()
+      }
+    },
+  },
+  {
+    id: 'confetti',
+    name: 'Confetti',
+    ink: INK,
+    border: '#ffffff',
+    bg(ctx, W, H) {
+      const r = rng(77)
+      ctx.fillStyle = '#fff8e1'
+      ctx.fillRect(0, 0, W, H)
+      const cols = ['#ff5fa2', '#3ca2fa', '#ffd23f', '#2ee6a6', '#8e5cff']
+      for (let i = 0; i < 130; i++) {
+        ctx.save()
+        ctx.translate(r() * W, r() * H)
+        ctx.rotate(r() * Math.PI)
+        ctx.fillStyle = cols[i % cols.length]
+        if (i % 3 === 0) {
+          ctx.beginPath()
+          ctx.arc(0, 0, 9 + r() * 7, 0, Math.PI * 2)
+          ctx.fill()
+        } else {
+          ctx.fillRect(-6, -18, 12, 36 * (0.5 + r() * 0.5))
+        }
+        ctx.restore()
+      }
+    },
+  },
+  {
+    id: 'grid',
+    name: 'Neon Grid',
+    ink: '#ffffff',
+    border: '#2ee6a6',
+    bg(ctx, W, H) {
+      ctx.fillStyle = '#10062e'
+      ctx.fillRect(0, 0, W, H)
+      ctx.strokeStyle = '#ff5fa2'
+      ctx.lineWidth = 3
+      ctx.shadowColor = '#ff5fa2'
+      ctx.shadowBlur = 12
+      const s = 60
+      ctx.beginPath()
+      for (let x = 0; x <= W; x += s) {
+        ctx.moveTo(x, 0)
+        ctx.lineTo(x, H)
+      }
+      for (let y = 0; y <= H; y += s) {
+        ctx.moveTo(0, y)
+        ctx.lineTo(W, y)
+      }
+      ctx.stroke()
+      ctx.shadowBlur = 0
+    },
+  },
+  {
+    id: 'stars',
+    name: 'Stars',
+    ink: INK,
+    border: '#ffffff',
+    bg(ctx, W, H) {
+      const r = rng(19)
+      ctx.fillStyle = '#ffd23f'
+      ctx.fillRect(0, 0, W, H)
+      const cols = ['#ffffff', '#ff5fa2', '#ff9d1f']
+      for (let i = 0; i < 60; i++) {
+        ctx.fillStyle = cols[i % cols.length]
+        starPath(ctx, r() * W, r() * H, 18 + r() * 26, 0.5, r())
+      }
+    },
+  },
 ]
 
 const club = (o) => ({ kind: 'img', group: 'club', ...o })
@@ -313,6 +537,8 @@ function drawSticker(ctx, s, W, H) {
   ctx.save()
   ctx.translate(s.x * W, s.y * H)
   ctx.rotate(s.rot)
+  if (s.blend) ctx.globalCompositeOperation = s.blend
+  if (s.alpha != null) ctx.globalAlpha = s.alpha
   if (!s.flat) ctx.shadowColor = 'rgba(3,10,46,.35)'
   if (!s.flat) ctx.shadowBlur = 14
   if (!s.flat) ctx.shadowOffsetY = 8
@@ -390,15 +616,93 @@ function paintInk(ctx, ink) {
   ctx.restore()
 }
 
+// Bucket: fills the connected area of the drawing under the tap. Only the ink layer is read, never the
+// photo, so a shape drawn on the picture fills up to its own border. A tap in open space that is not
+// enclosed by ink does nothing. The result is painted into the ink layer, so undo and the eraser work.
+const fillCache = new WeakMap()
+
+function bucketFill(ctx, layer, s) {
+  const w = ctx.canvas.width
+  const h = ctx.canvas.height
+  const k = ctx.getTransform().a
+  const sx = Math.min(w - 1, Math.max(0, Math.floor(s.x * k)))
+  const sy = Math.min(h - 1, Math.max(0, Math.floor(s.y * k)))
+  const top = layer.getImageData(0, 0, w, h)
+  const l = top.data
+
+  let sig = 0
+  const l32 = new Uint32Array(l.buffer)
+  for (let i = 0; i < l32.length; i++) sig = (Math.imul(sig, 31) + l32[i]) | 0
+  const key = `${w}x${h}:${sig}`
+  let mask = fillCache.get(s)?.key === key ? fillCache.get(s).mask : null
+
+  if (!mask) {
+    const s0 = (sy * w + sx) * 4
+    const [sr, sg, sb, sa] = [l[s0], l[s0 + 1], l[s0 + 2], l[s0 + 3]]
+    const seedClear = sa < 40
+    const match = (p) => {
+      const i = p * 4
+      if (seedClear) return l[i + 3] <= 200
+      return Math.abs(l[i] - sr) <= 40 && Math.abs(l[i + 1] - sg) <= 40 && Math.abs(l[i + 2] - sb) <= 40 && Math.abs(l[i + 3] - sa) <= 40
+    }
+    const seen = new Uint8Array(w * h)
+    const stack = new Int32Array(w * h)
+    let n = 0
+    let leaks = false
+    stack[n++] = sy * w + sx
+    seen[sy * w + sx] = 1
+    const push = (p) => {
+      if (!seen[p] && match(p)) {
+        seen[p] = 1
+        stack[n++] = p
+      }
+    }
+    while (n) {
+      const p = stack[--n]
+      const x = p % w
+      if (x === 0 || x === w - 1 || p < w || p >= w * (h - 1)) leaks = true
+      if (x > 0) push(p - 1)
+      if (x < w - 1) push(p + 1)
+      if (p >= w) push(p - w)
+      if (p < w * (h - 1)) push(p + w)
+    }
+    // Empty space that reaches the edge of the picture is not an enclosed shape.
+    mask = seedClear && leaks ? new Uint8Array(w * h) : seen
+    fillCache.set(s, { key, mask })
+  }
+
+  const rgb = parseInt(s.color.slice(1), 16)
+  const fr = (rgb >> 16) & 255
+  const fg = (rgb >> 8) & 255
+  const fb = rgb & 255
+  for (let p = 0; p < mask.length; p++) {
+    if (!mask[p]) continue
+    const i = p * 4
+    const a = l[i + 3] / 255
+    l[i] = Math.round(l[i] * a + fr * (1 - a))
+    l[i + 1] = Math.round(l[i + 1] * a + fg * (1 - a))
+    l[i + 2] = Math.round(l[i + 2] * a + fb * (1 - a))
+    l[i + 3] = 255
+  }
+  layer.save()
+  layer.setTransform(1, 0, 0, 1, 0, 0)
+  layer.putImageData(top, 0, 0)
+  layer.restore()
+}
+
 // The eraser only removes ink, never the photo, so erasing needs its own layer.
 function drawInk(ctx, ink) {
-  if (!ink.some((s) => s.erase)) return paintInk(ctx, ink)
+  if (!ink.some((s) => s.erase || s.type === 'fill')) return paintInk(ctx, ink)
   const off = document.createElement('canvas')
   off.width = ctx.canvas.width
   off.height = ctx.canvas.height
   const o = off.getContext('2d')
   o.setTransform(ctx.getTransform())
-  paintInk(o, ink)
+  // Strokes and fills are applied in order so a fill is bounded by the ink drawn before it.
+  for (const s of ink) {
+    if (s.type === 'fill') bucketFill(ctx, o, s)
+    else paintInk(o, [s])
+  }
   ctx.save()
   ctx.setTransform(1, 0, 0, 1, 0, 0)
   ctx.drawImage(off, 0, 0)
@@ -515,17 +819,10 @@ function drawFooter(ctx, layout, frame, caption, lang = 'en') {
   ctx.restore()
 }
 
-export function renderComposite(canvas, state, opts = {}) {
-  const { scale = 1, selectedId = null, withStickers = true, withFooter = true, handleR = 40 } = opts
-  const layout = getLayout(state.layout, state.shots)
-  const { W, H } = layout
-  canvas.width = Math.round(W * scale)
-  canvas.height = Math.round(H * scale)
-  const ctx = canvas.getContext('2d')
-  ctx.setTransform(scale, 0, 0, scale, 0, 0)
-  ctx.imageSmoothingQuality = 'high'
+function drawBase(ctx, layout, state, withFooter) {
   const frame = FRAMES.find((f) => f.id === state.frameId) || FRAMES[0]
   const filter = (FILTERS.find((f) => f.id === state.filterId) || FILTERS[0]).css
+  const { W, H } = layout
 
   frame.bg(ctx, W, H)
 
@@ -550,6 +847,83 @@ export function renderComposite(canvas, state, opts = {}) {
   })
 
   if (withFooter) drawFooter(ctx, layout, frame, state.caption, state.lang)
+}
+
+// The frame, photos (with their CSS filter) and footer are the expensive part and only change on
+// edits to those, not while a sticker or stroke is being dragged. With opts.cache the canvas keeps
+// them in an offscreen layer. The ink drawn before the stroke in progress is kept the same way.
+const layers = new WeakMap()
+
+function sameList(a, b) {
+  return a.length === b.length && a.every((v, i) => v === b[i])
+}
+
+function drawInkCached(ctx, layer, ink, scale, W, H) {
+  const done = ink.slice(0, -1)
+  const last = ink[ink.length - 1]
+  // A fill or erase has to see everything under it, so those go through the full path.
+  if (!done.length || last.erase || last.type === 'fill') return drawInk(ctx, ink)
+  let c = layer.ink
+  if (!c || c.scale !== scale || c.W !== W || !sameList(c.done, done)) {
+    const canvas = c?.canvas || document.createElement('canvas')
+    canvas.width = Math.round(W * scale)
+    canvas.height = Math.round(H * scale)
+    const o = canvas.getContext('2d')
+    o.setTransform(scale, 0, 0, scale, 0, 0)
+    drawInk(o, done)
+    c = layer.ink = { canvas, scale, W, done }
+  }
+  ctx.save()
+  ctx.setTransform(1, 0, 0, 1, 0, 0)
+  ctx.drawImage(c.canvas, 0, 0)
+  ctx.restore()
+  paintInk(ctx, [last])
+}
+
+export function renderComposite(canvas, state, opts = {}) {
+  const { scale = 1, selectedId = null, withStickers = true, withFooter = true, handleR = 40, cache = false } = opts
+  const layout = getLayout(state.layout, state.shots)
+  const { W, H } = layout
+  const cw = Math.round(W * scale)
+  const ch = Math.round(H * scale)
+  if (canvas.width !== cw) canvas.width = cw
+  if (canvas.height !== ch) canvas.height = ch
+  const ctx = canvas.getContext('2d')
+  ctx.setTransform(scale, 0, 0, scale, 0, 0)
+  ctx.imageSmoothingQuality = 'high'
+  ctx.clearRect(0, 0, W, H)
+
+  if (cache && document.fonts.status === 'loaded') {
+    let layer = layers.get(canvas)
+    if (!layer) layers.set(canvas, (layer = {}))
+    const k = layer.base
+    const hit =
+      k && k.scale === scale && k.layoutId === layout.id && k.H === H && k.shots === state.shots && k.frameId === state.frameId &&
+      k.filterId === state.filterId && k.photo === state.photo && k.caption === state.caption && k.lang === state.lang && k.withFooter === withFooter
+    if (!hit) {
+      const canvasB = k?.canvas || document.createElement('canvas')
+      canvasB.width = cw
+      canvasB.height = ch
+      const b = canvasB.getContext('2d')
+      b.setTransform(scale, 0, 0, scale, 0, 0)
+      b.imageSmoothingQuality = 'high'
+      drawBase(b, layout, state, withFooter)
+      layer.base = { canvas: canvasB, scale, layoutId: layout.id, H, shots: state.shots, frameId: state.frameId, filterId: state.filterId, photo: state.photo, caption: state.caption, lang: state.lang, withFooter }
+    }
+    ctx.save()
+    ctx.setTransform(1, 0, 0, 1, 0, 0)
+    ctx.drawImage(layer.base.canvas, 0, 0)
+    ctx.restore()
+    if (withStickers) {
+      state.stickers.forEach((s) => drawSticker(ctx, s, W, H))
+      if (state.ink && state.ink.length) drawInkCached(ctx, layer, state.ink, scale, W, H)
+      const sel = state.stickers.find((s) => s.id === selectedId)
+      if (sel) drawSelection(ctx, sel, W, H, handleR)
+    }
+    return
+  }
+
+  drawBase(ctx, layout, state, withFooter)
 
   if (withStickers) {
     state.stickers.forEach((s) => drawSticker(ctx, s, W, H))

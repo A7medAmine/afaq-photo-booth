@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import VideoView from '../VideoView.jsx'
-import { fileToShot, normalizePhoneUrl, testPhone } from '../camera.js'
+import { fileToShot, normalizePhoneUrl, readHealth, testPhone } from '../camera.js'
+import { SESSION_LIMITS } from '../boothSettings.js'
 import { LAYOUTS, STICKERS } from '../compose.js'
 import { groupOf } from '../customStickers.js'
 import { FACE_STICKERS } from '../faces.js'
@@ -8,7 +9,79 @@ import { setPin } from '../pin.js'
 import PinPad from './PinPad.jsx'
 import { LANGS, useI18n } from '../i18n.jsx'
 
-function Settings({ cam, custom, onClose, onTestFiles }) {
+const LIMIT_FIELDS = [
+  ['maxEdits', 'Times a guest can go back to edit', 'times. 0 hides the button.'],
+  ['maxExtends', 'Times a guest can extend the reset timer', 'times. 0 hides the button.'],
+  ['extendSeconds', 'Seconds added by each extension', 'seconds'],
+  ['doneSeconds', 'Seconds before the last screen resets', 'seconds'],
+  ['editIdleSeconds', 'Seconds of no touching before the editor resets', 'seconds. A warning shows for the last 20.'],
+]
+
+function CameraHealth({ cam }) {
+  const { settings, phoneStatus, demo, error, reconnect } = cam
+  const phone = settings.source === 'phone'
+  const [health, setHealth] = useState(null)
+  const [checked, setChecked] = useState(null)
+  const [spin, setSpin] = useState(false)
+  useEffect(() => {
+    if (!phone) return setHealth(null)
+    let live = true
+    const poll = async () => {
+      let h = null
+      try { h = await readHealth(settings) } catch { /* shown as unreachable */ }
+      if (live) {
+        setHealth(h)
+        setChecked(new Date())
+      }
+    }
+    poll()
+    const t = setInterval(poll, 5000)
+    return () => { live = false; clearInterval(t) }
+  }, [phone, settings.phoneUrl, settings.phoneMode, phoneStatus])
+  const state = demo
+    ? { cls: 'bad', text: 'Not connected: showing the demo camera' }
+    : phone
+      ? { live: { cls: 'ok', text: 'Connected and streaming' }, connecting: { cls: 'warn', text: 'Connecting...' }, lost: { cls: 'bad', text: 'Stream lost, reconnecting...' }, idle: { cls: 'warn', text: 'Waiting' } }[phoneStatus]
+      : { cls: 'ok', text: "Using this computer's camera" }
+  const low = health?.battery != null && health.battery <= 20 && !health.charging
+  return (
+    <div className="field health">
+      Camera health
+      <div className="health-row">
+        <span className={`dot ${state.cls}`} aria-hidden="true" />
+        <strong>{state.text}</strong>
+      </div>
+      {phone && (
+        <ul className="health-list">
+          <li>Phone app: {health ? `reachable (${health.camera} camera, ${health.width}x${health.height})` : 'not answering'}</li>
+          <li>
+            Battery:{' '}
+            {health?.battery != null ? (
+              <span className={low ? 'low' : ''}>{Math.round(health.battery)}%{health.charging ? ' (charging)' : ''}{low ? ' - plug the phone in' : ''}</span>
+            ) : health ? 'not reported by the phone app' : 'unknown'}
+          </li>
+          {checked && <li>Last checked {checked.toLocaleTimeString()}</li>}
+        </ul>
+      )}
+      {error && <span className="note">Reason: {error}</span>}
+      <div className="row-tight">
+        <button
+          className="btn btn-ghost"
+          disabled={spin}
+          onClick={() => {
+            setSpin(true)
+            reconnect()
+            setTimeout(() => setSpin(false), 2000)
+          }}
+        >
+          {spin ? 'Reconnecting...' : 'Reconnect camera'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function Settings({ cam, custom, booth, updateBooth, onClose, onTestFiles }) {
   const { settings, update, devices, error, demo, phoneStatus } = cam
   const [phoneUrl, setPhoneUrl] = useState(settings.phoneUrl)
   const [test, setTest] = useState('')
@@ -132,6 +205,25 @@ function Settings({ cam, custom, onClose, onTestFiles }) {
             Showing the demo camera. {error ? `Reason: ${error}.` : ''} {settings.source === 'device' ? 'Plug in a camera and choose it above.' : 'Check the phone address above.'}
           </p>
         )}
+        <CameraHealth cam={cam} />
+        <div className="field">
+          Guest session limits
+          {LIMIT_FIELDS.map(([key, label, unit]) => (
+            <label className="limit" key={key}>
+              <span>{label}</span>
+              <input
+                type="number"
+                inputMode="numeric"
+                min={SESSION_LIMITS[key][0]}
+                max={SESSION_LIMITS[key][1]}
+                value={booth[key]}
+                onChange={(e) => updateBooth({ [key]: e.target.valueAsNumber })}
+              />
+              <span className="note">{unit}</span>
+            </label>
+          ))}
+          <span className="note">The limits reset for every new guest. Guest photos are deleted from the server 10 minutes after upload unless the guest ticks the box to let the club keep them.</span>
+        </div>
         <div className="field">
           Sticker folders
           <div className="row-tight">
@@ -184,7 +276,7 @@ function Settings({ cam, custom, onClose, onTestFiles }) {
                         + Add pictures
                         <input type="file" accept="image/*" multiple hidden onChange={(e) => { custom.add([...e.target.files], g.id); e.target.value = '' }} />
                       </label>
-                      <button className="btn btn-ghost" aria-label={`Delete ${g.name} folder`} onClick={() => custom.deleteGroup(g.id)}>Delete</button>
+                      <button className="btn btn-ghost" aria-label={`Delete ${g.name} folder`} onClick={() => { if (window.confirm(`Delete the "${g.name}" folder? The stickers inside are kept and move to the unsorted folder.`)) custom.deleteGroup(g.id) }}>Delete</button>
                     </>
                   )}
                 </div>
@@ -311,7 +403,7 @@ const FLOATERS = [
   ['plus_1000_aura', pos(22, { left: '34%', top: '0%' }, -5, 7)],
 ]
 
-export default function Attract({ cam, custom, onStart, onTestPhotos }) {
+export default function Attract({ cam, custom, booth, updateBooth, onStart, onTestPhotos }) {
   const [stage, setStage] = useState(null)
   const { t, lang, setLang } = useI18n()
 
@@ -375,6 +467,8 @@ export default function Attract({ cam, custom, onStart, onTestPhotos }) {
         <Settings
           cam={cam}
           custom={custom}
+          booth={booth}
+          updateBooth={updateBooth}
           onClose={() => setStage(null)}
           onTestFiles={(files) => {
             setStage(null)

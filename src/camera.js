@@ -138,6 +138,18 @@ async function readMjpeg(url, signal, onFrame) {
 
 // Draws the phone's MJPEG into a canvas so the booth sees a normal MediaStream.
 // Reconnects on its own; onStatus reports 'live' or 'lost'.
+// Reads the phone's /health once, for the operator's camera status panel.
+// Battery is optional: { battery: 0-100, charging: bool } when the phone app reports it.
+export async function readHealth(settings) {
+  const base = phoneBaseOf(settings)
+  if (!base) throw new Error('No phone address')
+  const r = await fetchTimeout(`${base}/health`, 3000)
+  if (!r.ok) throw new Error(`Phone answered with status ${r.status}`)
+  const h = await r.json()
+  if (!h?.ok) throw new Error('Not the AFAQ camera app')
+  return h
+}
+
 export function makePhoneStream(baseUrl, onStatus, beforeRetry) {
   const c = document.createElement('canvas')
   c.width = 1280
@@ -207,6 +219,7 @@ export function useCamera() {
   const [error, setError] = useState('')
   const [demo, setDemo] = useState(false)
   const [phoneStatus, setPhoneStatus] = useState('idle')
+  const [attempt, setAttempt] = useState(0)
   const current = useRef(null)
 
   const update = useCallback((patch) => {
@@ -282,9 +295,11 @@ export function useCamera() {
       cancelled = true
       clearTimeout(retry)
     }
-  }, [settings.deviceId, phoneBase, usb])
+  }, [settings.deviceId, phoneBase, usb, attempt])
 
-  return { stream, devices, error, demo, settings, update, phoneStatus }
+  const reconnect = useCallback(() => setAttempt((n) => n + 1), [])
+
+  return { stream, devices, error, demo, settings, update, phoneStatus, reconnect }
 }
 
 export function capture(video, mirror) {

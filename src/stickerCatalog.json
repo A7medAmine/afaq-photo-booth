@@ -788,5 +788,125 @@
   "id": "kiwi_face",
   "group": "memes",
   "aspect": 0.922
+ },
+ {
+  "id": "pixel_cat_scream",
+  "group": "cats",
+  "aspect": 0.945
+ },
+ {
+  "id": "blossom_annoyed",
+  "group": "memes",
+  "aspect": 0.846
+ },
+ {
+  "id": "clarence_chowder",
+  "group": "memes",
+  "aspect": 0.994
+ },
+ {
+  "id": "dog_hands_in_pockets",
+  "group": "cute",
+  "aspect": 0.613
+ },
+ {
+  "id": "snorlax_peek",
+  "group": "cute",
+  "aspect": 2.845
+ },
+ {
+  "id": "cpp_logo",
+  "group": "tech",
+  "aspect": 0.914
+ },
+ {
+  "id": "openai_logo",
+  "group": "tech",
+  "aspect": 0.955
+ },
+ {
+  "id": "shut_up_and_study",
+  "group": "memes",
+  "aspect": 0.947
+ },
+ {
+  "id": "jake_dab",
+  "group": "memes",
+  "aspect": 0.942
+ },
+ {
+  "id": "sql_syringe",
+  "group": "tech",
+  "aspect": 1.105
+ },
+ {
+  "id": "clawd_coffee",
+  "group": "tech",
+  "aspect": 1.59
+ },
+ {
+  "id": "frieren_scarf",
+  "group": "cute",
+  "aspect": 0.839
+ },
+ {
+  "id": "cheems_pixel",
+  "group": "memes",
+  "aspect": 0.789
+ },
+ {
+  "id": "claude_logo",
+  "group": "tech",
+  "aspect": 3.737
+ },
+ {
+  "id": "clawd_happy",
+  "group": "tech",
+  "aspect": 1.249
+ },
+ {
+  "id": "clawd_make_no_mistakes",
+  "group": "tech",
+  "aspect": 1.344
+ },
+ {
+  "id": "clawd_mascot",
+  "group": "tech",
+  "aspect": 1.542
+ },
+ {
+  "id": "clawd_cooking",
+  "group": "tech",
+  "aspect": 1.506
+ },
+ {
+  "id": "clawd_headphones",
+  "group": "tech",
+  "aspect": 1.061
+ },
+ {
+  "id": "clawd_paragliding",
+  "group": "tech",
+  "aspect": 1.08
+ },
+ {
+  "id": "clawd_rocket",
+  "group": "tech",
+  "aspect": 1.69
+ },
+ {
+  "id": "clawd_sleeping",
+  "group": "tech",
+  "aspect": 1.822
+ },
+ {
+  "id": "clawd_wizard",
+  "group": "tech",
+  "aspect": 1.169
+ },
+ {
+  "id": "let_claude_cook",
+  "group": "tech",
+  "aspect": 1.219
  }
 ]

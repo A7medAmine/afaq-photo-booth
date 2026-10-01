@@ -31,6 +31,8 @@ const TEXT_COLORS = ['#ffd23f', '#ff5fa2', '#2ee6a6', '#3ca2fa', '#ffffff', '#ff
 const fitSize = (len) => clamp(0.62 / (0.34 * (0.62 * len + 1)), 0.08, 0.45)
 const uid = () => Math.random().toString(36).slice(2, 9)
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v))
+const MAX_ZOOM = 5
+const ZOOM_STEP = 1.5
 
 function Mini({ layout, shots, frameId, filterId, caption, lang, width = 96 }) {
   const ref = useRef(null)
@@ -57,35 +59,92 @@ export default function Edit({ custom = [], faceCustom = [], hidden = [], groups
   const [shape, setShape] = useState('circle')
   const [filled, setFilled] = useState(true)
   const [faces, setFaces] = useState(null)
-  const [who, setWho] = useState(null)
+  const [who, setWho] = useState([])
+  const [showNums, setShowNums] = useState(true)
   const canvasRef = useRef(null)
   const stageRef = useRef(null)
+  const boxRef = useRef(null)
   const drag = useRef(null)
+  const pointers = useRef(new Map())
+  const pinch = useRef(null)
+  const [view, setView] = useState({ z: 1, x: 0, y: 0 })
+  const [hand, setHand] = useState(false)
   const L = useMemo(() => getLayout(layout, shots), [layout, shots])
 
   const state = useMemo(() => ({ layout, shots, lang, ...edit }), [layout, shots, lang, edit])
 
   const [tick, setTick] = useState(0)
+  const viewRef = useRef(view)
+  viewRef.current = view
   useEffect(() => {
     const bump = () => setTick((t) => t + 1)
     window.addEventListener('resize', bump)
     return () => window.removeEventListener('resize', bump)
   }, [])
 
+  // Zoom is a CSS transform on the canvas, so pointer maths through getBoundingClientRect stays correct.
+  const fitView = (z, x, y) => {
+    const cv = canvasRef.current
+    const w = cv ? cv.offsetWidth : 0
+    const h = cv ? cv.offsetHeight : 0
+    const zc = clamp(z, 1, MAX_ZOOM)
+    return { z: zc, x: clamp(x, w * (1 - zc), 0), y: clamp(y, h * (1 - zc), 0) }
+  }
+  // Zoom to z keeping the box point (ax, ay) fixed under the finger or cursor.
+  const zoomAt = (z, ax, ay) =>
+    setView((v) => {
+      const zc = clamp(z, 1, MAX_ZOOM)
+      const k = zc / v.z
+      return fitView(zc, ax - (ax - v.x) * k, ay - (ay - v.y) * k)
+    })
+  const zoomCenter = (f) => {
+    const cv = canvasRef.current
+    zoomAt(view.z * f, cv.offsetWidth / 2, cv.offsetHeight / 2)
+  }
+  const resetView = () => {
+    setView({ z: 1, x: 0, y: 0 })
+    setHand(false)
+  }
+  const boxPoint = (ev) => {
+    const r = boxRef.current.getBoundingClientRect()
+    return { x: ev.clientX - r.left - 5, y: ev.clientY - r.top - 5 }
+  }
+
+  useEffect(() => {
+    const box = boxRef.current
+    const wheel = (ev) => {
+      ev.preventDefault()
+      const r = box.getBoundingClientRect()
+      zoomAt(viewRef.current.z * Math.exp(-ev.deltaY * 0.0015), ev.clientX - r.left - 5, ev.clientY - r.top - 5)
+    }
+    box.addEventListener('wheel', wheel, { passive: false })
+    return () => box.removeEventListener('wheel', wheel)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  useEffect(() => {
+    setView((v) => fitView(v.z, v.x, v.y))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tick])
+
   const handleR = () => {
     const w = canvasRef.current.getBoundingClientRect().width || L.W
     return (26 * L.W) / w
   }
 
+  // Pointer moves can arrive several times per frame, so paint at most once per frame.
   useEffect(() => {
-    renderComposite(canvasRef.current, state, { scale: 0.9, selectedId, handleR: handleR() })
+    const raf = requestAnimationFrame(() =>
+      renderComposite(canvasRef.current, state, { scale: view.z > 1.5 ? 1.8 : 0.9, selectedId, handleR: handleR(), cache: true }),
+    )
+    return () => cancelAnimationFrame(raf)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state, selectedId, tick])
+  }, [state, selectedId, tick, view.z > 1.5, view.z])
 
   useEffect(() => {
     let live = true
     Promise.all(L.slots.map((_, i) => detectFaces(shots[i])))
-      .then((f) => live && (setFaces(f), setWho(null)))
+      .then((f) => live && (setFaces(f), setWho([])))
       .catch(() => live && setFaces([]))
     return () => { live = false }
   }, [L, shots])
@@ -139,9 +198,30 @@ export default function Edit({ custom = [], faceCustom = [], hidden = [], groups
   }
 
   const onDown = (ev) => {
+    pointers.current.set(ev.pointerId, boxPoint(ev))
+    canvasRef.current.setPointerCapture(ev.pointerId)
+    if (pointers.current.size === 2) {
+      // A second finger turns the gesture into pinch-zoom and pan; drop whatever the first finger started.
+      if (drag.current?.mode === 'ink') setEdit((e) => ({ ...e, ink: e.ink.slice(0, -1) }))
+      drag.current = null
+      const [a, b] = [...pointers.current.values()]
+      const v = viewRef.current
+      pinch.current = { d0: Math.hypot(a.x - b.x, a.y - b.y) || 1, mx: (a.x + b.x) / 2, my: (a.y + b.y) / 2, v }
+      return
+    }
+    if (pointers.current.size > 2) return
+    if (hand && view.z > 1) {
+      const p = boxPoint(ev)
+      drag.current = { mode: 'pan', px: p.x, py: p.y, v: viewRef.current }
+      return
+    }
     const { x, y } = toLayoutXY(ev)
     if (tab === 'Photo') return
     if (tab === 'Draw') {
+      if (drawTool === 'fill') {
+        setEdit((e) => ({ ...e, ink: [...(e.ink || []), { type: 'fill', color: inkColor, x, y }] }))
+        return
+      }
       const base = { color: inkColor, size: (inkSize * L.W) / 1200 }
       const stroke =
         drawTool === 'shape'
@@ -184,7 +264,25 @@ export default function Edit({ custom = [], faceCustom = [], hidden = [], groups
     }
   }
   const onMove = (ev) => {
+    if (pointers.current.has(ev.pointerId)) pointers.current.set(ev.pointerId, boxPoint(ev))
+    if (pinch.current) {
+      if (pointers.current.size < 2) return
+      const [a, b] = [...pointers.current.values()]
+      const { d0, mx, my, v } = pinch.current
+      const z = clamp(v.z * (Math.hypot(a.x - b.x, a.y - b.y) / d0), 1, MAX_ZOOM)
+      const k = z / v.z
+      const cx = (a.x + b.x) / 2
+      const cy = (a.y + b.y) / 2
+      setView(fitView(z, cx - (mx - v.x) * k, cy - (my - v.y) * k))
+      return
+    }
     if (!drag.current) return
+    if (drag.current.mode === 'pan') {
+      const { px, py, v } = drag.current
+      const p = boxPoint(ev)
+      setView(fitView(v.z, v.x + p.x - px, v.y + p.y - py))
+      return
+    }
     const { x, y } = toLayoutXY(ev)
     if (drag.current.mode === 'ink') {
       setEdit((e) => ({
@@ -222,7 +320,12 @@ export default function Edit({ custom = [], faceCustom = [], hidden = [], groups
       ev.dataTransfer.effectAllowed = 'copy'
     },
   })
-  const onUp = () => {
+  const onUp = (ev) => {
+    pointers.current.delete(ev.pointerId)
+    if (pinch.current) {
+      if (pointers.current.size < 2) pinch.current = null
+      return
+    }
     if (drag.current && drag.current.mode === 'ink') {
       setEdit((e) => {
         const last = e.ink[e.ink.length - 1]
@@ -277,12 +380,13 @@ export default function Edit({ custom = [], faceCustom = [], hidden = [], groups
     addSticker(base)
   }
 
-  // Face stickers go to one chosen person, or to everyone when nobody is chosen.
+  // Face stickers go to the chosen people (any number), or to everyone when nobody is chosen.
   const faceKey = (shot, idx) => `${shot}:${idx}`
+  const toggleWho = (key) => setWho((w) => (w.includes(key) ? w.filter((k) => k !== key) : [...w, key]))
   const everyone = faces ? faces.flatMap((list, shot) => list.map((_, idx) => ({ shot, idx, key: faceKey(shot, idx) }))) : []
   const faceCount = everyone.length
-  const targets = who ? everyone.filter((f) => f.key === who) : everyone
-  const inTarget = (s) => s.face && (!who || faceKey(s.face.shot, s.face.idx) === who)
+  const targets = who.length ? everyone.filter((f) => who.includes(f.key)) : everyone
+  const inTarget = (s) => s.face && (!who.length || who.includes(faceKey(s.face.shot, s.face.idx)))
   const onFace = (item) => edit.stickers.filter((s) => inTarget(s) && s.face.item === item.id).length
   const toggleFace = (item) => {
     const photo = edit.photo || DEFAULT_PHOTO
@@ -295,6 +399,8 @@ export default function Edit({ custom = [], faceCustom = [], hidden = [], groups
             kind: 'img',
             src: item.src,
             flat: item.flat,
+            blend: item.blend,
+            alpha: item.alpha,
             id: uid(),
             rot: 0,
             face: { shot, idx, item: item.id, part },
@@ -313,7 +419,7 @@ export default function Edit({ custom = [], faceCustom = [], hidden = [], groups
   const badges = []
   const cv = canvasRef.current
   const stage = stageRef.current
-  if (tab === 'Face' && faces && cv && stage) {
+  if (tab === 'Face' && showNums && faces && cv && stage) {
     const r = cv.getBoundingClientRect()
     const sr = stage.getBoundingClientRect()
     const k = r.width / L.W
@@ -321,7 +427,12 @@ export default function Edit({ custom = [], faceCustom = [], hidden = [], groups
     everyone.forEach((f, n) => {
       const face = faces[f.shot][f.idx]
       const c = shotToLayout(shots[f.shot], L.slots[f.shot], photo, { x: (face.eyes.x + face.chin.x) / 2, y: (face.eyes.y + face.chin.y) / 2 })
-      badges.push({ ...f, n: n + 1, x: r.left - sr.left + c.x * k, y: r.top - sr.top + c.y * k, d: face.width * c.k * k * 1.5 })
+      const chin = shotToLayout(shots[f.shot], L.slots[f.shot], photo, face.chin)
+      const bx = r.left - sr.left + c.x * k
+      const by = r.top - sr.top + c.y * k
+      const br = boxRef.current.getBoundingClientRect()
+      if (bx + sr.left < br.left || bx + sr.left > br.right || by + sr.top < br.top || by + sr.top > br.bottom) return
+      badges.push({ ...f, n: n + 1, x: r.left - sr.left + c.x * k, y: r.top - sr.top + c.y * k, d: face.width * c.k * k * 1.5, drop: (chin.y - c.y) * k + 16 })
     })
   }
 
@@ -334,22 +445,37 @@ export default function Edit({ custom = [], faceCustom = [], hidden = [], groups
   return (
     <main className="screen edit">
       <section className="stage" ref={stageRef}>
-        <canvas
-          ref={canvasRef}
-          className={`edit-canvas ${tab === 'Draw' ? 'drawing' : ''} `}
-          style={{ aspectRatio: `${L.W} / ${L.H}`, '--ar': L.W / L.H }}
-          onPointerDown={onDown}
-          onPointerMove={onMove}
-          onPointerUp={onUp}
-          onPointerCancel={onUp}
-          onDragOver={(e) => e.preventDefault()}
-          onDrop={onDropSticker}
-          aria-label={t('edit.canvas')}
-        />
+        <div className="zoom-wrap" style={{ '--ar': L.W / L.H }}>
+          <div className="zoom-box" ref={boxRef}>
+            <canvas
+              ref={canvasRef}
+              className={`edit-canvas ${tab === 'Draw' && !hand ? 'drawing' : ''} ${hand && view.z > 1 ? 'hand' : ''}`}
+              style={{ aspectRatio: `${L.W} / ${L.H}`, transform: `translate(${view.x}px, ${view.y}px) scale(${view.z})` }}
+              onPointerDown={onDown}
+              onPointerMove={onMove}
+              onPointerUp={onUp}
+              onPointerCancel={onUp}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={onDropSticker}
+              aria-label={t('edit.canvas')}
+            />
+          </div>
+          <div className="view-ctl">
+            <button className="tool" aria-label={t('zoom.in')} disabled={view.z >= MAX_ZOOM} onClick={() => zoomCenter(ZOOM_STEP)}>+</button>
+            <button className="tool" aria-label={t('zoom.out')} disabled={view.z <= 1} onClick={() => zoomCenter(1 / ZOOM_STEP)}>−</button>
+            {view.z > 1 && (
+              <>
+                <button className={`tool ${hand ? 'on' : ''}`} aria-label={t('zoom.pan')} aria-pressed={hand} onClick={() => setHand((h) => !h)}>✋</button>
+                <button className="tool" aria-label={t('zoom.reset')} onClick={resetView}>⤢</button>
+                <span className="view-lvl">{Math.round(view.z * 100)}%</span>
+              </>
+            )}
+          </div>
+        </div>
         {badges.map((b) => (
           <div key={b.key} className="face-pick" style={{ left: b.x, top: b.y, width: b.d, height: b.d }}>
-            {who === b.key && <span className="face-ring" />}
-            <button className={`face-badge ${who === b.key ? 'on' : ''}`} aria-pressed={who === b.key} aria-label={t('face.person', { n: b.n })} onClick={() => setWho(who === b.key ? null : b.key)}>{b.n}</button>
+            {who.includes(b.key) && <span className="face-ring" />}
+            <button className={`face-badge ${who.includes(b.key) ? 'on' : ''}`} aria-pressed={who.includes(b.key)} aria-label={t('face.person', { n: b.n })} style={{ marginTop: b.drop }} onClick={() => toggleWho(b.key)}>{b.n}</button>
           </div>
         ))}
         <div className={`sticker-bar ${selected ? 'on' : ''}`} role="toolbar" aria-label={t('edit.selected')}>
@@ -423,9 +549,10 @@ export default function Edit({ custom = [], faceCustom = [], hidden = [], groups
               <p className="hint">{t('face.hint')}</p>
               <p className="note" role="status">{!faces ? t('face.looking') : faceCount ? t('face.found', { n: faceCount }) : t('face.none')}</p>
               {faceCount > 1 && (
-                <div className="chips" role="radiogroup" aria-label={t('face.apply')}>
-                  {[{ key: null, label: t('face.everyone') }, ...everyone.map((f, n) => ({ key: f.key, label: String(n + 1) }))].map((c) => (
-                    <button key={c.key ?? 'all'} role="radio" aria-checked={who === c.key} className={`chip ${who === c.key ? 'on' : ''}`} onClick={() => setWho(c.key)}>{c.label}</button>
+                <div className="chips" role="group" aria-label={t('face.apply')}>
+                  <button aria-pressed={!who.length} className={`chip ${!who.length ? 'on' : ''}`} onClick={() => setWho([])}>{t('face.everyone')}</button>
+                  {everyone.map((f, n) => (
+                    <button key={f.key} aria-pressed={who.includes(f.key)} className={`chip ${who.includes(f.key) ? 'on' : ''}`} onClick={() => toggleWho(f.key)}>{n + 1}</button>
                   ))}
                 </div>
               )}
@@ -436,6 +563,9 @@ export default function Edit({ custom = [], faceCustom = [], hidden = [], groups
                   </button>
                 ))}
               </div>
+              {faceCount > 1 && (
+                <button className="btn btn-ghost" aria-pressed={!showNums} onClick={() => setShowNums((v) => !v)}>{showNums ? t('face.hideNums') : t('face.showNums')}</button>
+              )}
               <button className="btn btn-ghost" disabled={!edit.stickers.some(inTarget)} onClick={clearFaces}>{t('face.clear')}</button>
             </div>
           )}
@@ -444,8 +574,8 @@ export default function Edit({ custom = [], faceCustom = [], hidden = [], groups
             <div className="draw-tab">
               <p className="hint">{t('edit.drawHint')}</p>
               <ColorSwatches base={INK_COLORS} custom={edit.colors} value={inkColor} onPick={setInkColor} onAdd={addColor} />
-              <div className="tool-grid two" role="radiogroup" aria-label={t('edit.tool')}>
-                {[['pen', t('edit.pen')], ['erase', t('edit.eraser')]].map(([id, label]) => (
+              <div className="tool-grid three" role="radiogroup" aria-label={t('edit.tool')}>
+                {[['pen', t('edit.pen')], ['fill', t('doodle.fill')], ['erase', t('edit.eraser')]].map(([id, label]) => (
                   <button key={id} role="radio" aria-checked={drawTool === id} className={`tool ${drawTool === id ? 'on' : ''}`} onClick={() => setDrawTool(id)}>
                     <span className="tool-icon"><ToolIcon name={id} /></span>
                     <span>{label}</span>

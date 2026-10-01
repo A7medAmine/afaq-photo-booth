@@ -10,15 +10,21 @@ const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data')
 const PORT = process.env.PORT || 8787
 const UPLOAD_KEY = process.env.UPLOAD_KEY || ''
 const PUBLIC_URL = (process.env.PUBLIC_URL || '').replace(/\/$/, '')
+// Photos are temporary unless the guest ticks the box to let the club keep them.
+const TEMP_MINUTES = Math.max(1, Number(process.env.TEMP_MINUTES) || 10)
+const TEMP_MS = TEMP_MINUTES * 60 * 1000
+const TOKEN_SECRET = process.env.TOKEN_SECRET || crypto.randomBytes(24).toString('hex')
+const TEMP_DIR = path.join(DATA_DIR, 'temp')
 
 fs.mkdirSync(DATA_DIR, { recursive: true })
+fs.mkdirSync(TEMP_DIR, { recursive: true })
 
 const app = express()
 
 app.use((req, res, next) => {
   res.set('Access-Control-Allow-Origin', '*')
-  res.set('Access-Control-Allow-Headers', 'Content-Type, X-Upload-Key')
-  res.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+  res.set('Access-Control-Allow-Headers', 'Content-Type, X-Upload-Key, X-Token, X-Keep')
+  res.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
   if (req.method === 'OPTIONS') return res.sendStatus(204)
   next()
 })
@@ -38,8 +44,37 @@ app.post('/api/phone/usb', (req, res) => {
 
 const newId = () => crypto.randomBytes(6).toString('base64url')
 const isId = (id) => /^[A-Za-z0-9_-]{6,12}$/.test(id)
-const fileOf = (id) => path.join(DATA_DIR, `${id}.jpg`)
+const keptFile = (id) => path.join(DATA_DIR, `${id}.jpg`)
+const tempFile = (id) => path.join(TEMP_DIR, `${id}.jpg`)
 const baseUrl = (req) => PUBLIC_URL || `${req.protocol}://${req.get('host')}`
+const tokenOf = (id) => crypto.createHmac('sha256', TOKEN_SECRET).update(id).digest('base64url').slice(0, 22)
+const allowed = (req, id) => {
+  const got = Buffer.from(req.get('X-Token') || '')
+  const want = Buffer.from(tokenOf(id))
+  return got.length === want.length && crypto.timingSafeEqual(got, want)
+}
+
+// Where a photo lives right now, and when it disappears (null = kept).
+function locate(id) {
+  if (!isId(id)) return null
+  if (fs.existsSync(keptFile(id))) return { file: keptFile(id), expires: null }
+  try {
+    const { mtimeMs } = fs.statSync(tempFile(id))
+    if (Date.now() - mtimeMs < TEMP_MS) return { file: tempFile(id), expires: mtimeMs + TEMP_MS }
+  } catch { /* not there */ }
+  return null
+}
+
+function sweep() {
+  for (const name of fs.readdirSync(TEMP_DIR)) {
+    const file = path.join(TEMP_DIR, name)
+    try {
+      if (Date.now() - fs.statSync(file).mtimeMs >= TEMP_MS) fs.unlinkSync(file)
+    } catch { /* already gone */ }
+  }
+}
+sweep()
+setInterval(sweep, 30 * 1000).unref()
 
 app.post('/api/photos', express.raw({ type: 'image/*', limit: '20mb' }), (req, res) => {
   if (UPLOAD_KEY && req.get('X-Upload-Key') !== UPLOAD_KEY) {
@@ -49,24 +84,48 @@ app.post('/api/photos', express.raw({ type: 'image/*', limit: '20mb' }), (req, r
     return res.status(400).json({ error: 'send the JPEG as the raw request body' })
   }
   const id = newId()
-  fs.writeFileSync(fileOf(id), req.body)
-  res.json({ id, url: `${baseUrl(req)}/p/${id}` })
+  const keep = req.get('X-Keep') === '1'
+  fs.writeFileSync(keep ? keptFile(id) : tempFile(id), req.body)
+  res.json({ id, token: tokenOf(id), keep, ttlMinutes: TEMP_MINUTES, url: `${baseUrl(req)}/p/${id}` })
+})
+
+// The guest can tick or untick "let the club keep my photo" after upload. Unticked photos expire.
+app.put('/api/photos/:id/keep', express.json(), (req, res) => {
+  const { id } = req.params
+  if (!isId(id) || !allowed(req, id)) return res.sendStatus(403)
+  const at = locate(id)
+  if (!at) return res.sendStatus(404)
+  const keep = req.body?.keep === true
+  if (keep && at.expires) {
+    fs.renameSync(tempFile(id), keptFile(id))
+  } else if (!keep && !at.expires) {
+    fs.renameSync(keptFile(id), tempFile(id))
+    fs.utimesSync(tempFile(id), new Date(), new Date())
+  }
+  res.json({ keep })
+})
+
+app.delete('/api/photos/:id', (req, res) => {
+  const { id } = req.params
+  if (!isId(id) || !allowed(req, id)) return res.sendStatus(403)
+  for (const f of [keptFile(id), tempFile(id)]) fs.rmSync(f, { force: true })
+  res.sendStatus(204)
 })
 
 app.get('/files/:id.jpg', (req, res) => {
-  const { id } = req.params
-  if (!isId(id) || !fs.existsSync(fileOf(id))) return res.sendStatus(404)
-  if (req.query.dl) res.set('Content-Disposition', `attachment; filename="afaq-photo-${id}.jpg"`)
-  res.set('Cache-Control', 'public, max-age=86400')
-  res.type('image/jpeg').sendFile(fileOf(id))
+  const at = locate(req.params.id)
+  if (!at) return res.sendStatus(404)
+  if (req.query.dl) res.set('Content-Disposition', `attachment; filename="afaq-photo-${req.params.id}.jpg"`)
+  res.set('Cache-Control', at.expires ? 'private, no-store' : 'public, max-age=86400')
+  res.type('image/jpeg').sendFile(at.file)
 })
 
 app.get('/p/:id', (req, res) => {
   const { id } = req.params
-  if (!isId(id) || !fs.existsSync(fileOf(id))) {
-    return res.status(404).type('html').send(page('Photo not found', notFound()))
-  }
-  res.type('html').send(page('Your AFAQ photo', photoView(id), `${baseUrl(req)}/files/${id}.jpg`))
+  const at = locate(id)
+  if (!at) return res.status(404).type('html').send(page('Photo not found', notFound()))
+  const left = at.expires ? Math.max(1, Math.ceil((at.expires - Date.now()) / 60000)) : 0
+  res.type('html').send(page('Your AFAQ photo', photoView(id, left), at.expires ? '' : `${baseUrl(req)}/files/${id}.jpg`))
 })
 
 app.get('/', (_req, res) => res.type('html').send(page('AFAQ Photo Booth', notFound(true))))
@@ -107,16 +166,16 @@ ${ogImage ? `<meta property="og:image" content="${ogImage}">` : ''}
 ${body}
 </main></body></html>`
 
-const photoView = (id) => `
+const photoView = (id, left) => `
 <div class="card"><img src="/files/${id}.jpg" alt="Your photo booth picture"></div>
 <h1>Looking good!</h1>
 <p>Save your picture to your phone.</p>
 <a class="btn" href="/files/${id}.jpg?dl=1" download>Download photo</a>
-<small>Tip: on iPhone, press and hold the photo and choose Add to Photos.</small>`
+<small>${left ? `Your photo is deleted from our server in about ${left} minute${left === 1 ? '' : 's'}, so download it now.` : ''} Tip: on iPhone, press and hold the photo and choose Add to Photos.</small>`
 
 const notFound = (home) => `
 <h1>${home ? 'AFAQ Photo Booth' : 'Photo not found'}</h1>
-<p>${home ? 'Scan the QR code at the booth to get your photo.' : 'This link may be wrong, or the photo was removed. Ask at the booth for a new code.'}</p>`
+<p>${home ? 'Scan the QR code at the booth to get your photo.' : 'This link may be wrong, or the photo has expired or was removed. Ask at the booth for a new code.'}</p>`
 
 app.use('/assets', express.static(path.join(__dirname, '..', 'public', 'assets')))
 app.use('/fonts', express.static(path.join(__dirname, '..', 'public', 'fonts')))

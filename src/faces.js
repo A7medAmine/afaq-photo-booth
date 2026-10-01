@@ -1,4 +1,3 @@
-import { FaceLandmarker, FilesetResolver } from '@mediapipe/tasks-vision'
 import { loadImage } from './compose.js'
 
 function art(w, h, draw) {
@@ -39,15 +38,22 @@ const clownNose = art(160, 160, (ctx) => {
 export const PARTS = { cheeks: 2 }
 
 export const FACE_STICKERS = [
-  { id: 'f-tophat', anchor: 'top', src: '/assets/emoji/1f3a9.png', width: 1.1 },
-  { id: 'f-crown', anchor: 'top', src: '/assets/emoji/1f451.png', width: 0.95 },
-  { id: 'f-cap', anchor: 'top', src: '/assets/emoji/1f9e2.png', width: 1.15 },
+  { id: 'f-tophat', anchor: 'top', src: '/assets/emoji/1f3a9.png', width: 1.3 },
+  { id: 'f-crown', anchor: 'top', src: '/assets/emoji/1f451.png', width: 1.1 },
+  { id: 'f-cap', anchor: 'top', src: '/assets/emoji/1f9e2.png', width: 1.35 },
   { id: 'f-bow', anchor: 'top', src: '/assets/emoji/1f380.png', width: 0.7 },
+  { id: 'f-hat-cowboy', anchor: 'top', src: '/assets/stickers/hat_cowboy.webp', width: 1.6 },
+  { id: 'f-hat-witch', anchor: 'top', src: '/assets/stickers/hat_witch_black.webp', width: 1.55 },
+  { id: 'f-hat-witch-purple', anchor: 'top', src: '/assets/stickers/hat_witch_purple.webp', width: 1.35 },
   { id: 'f-glasses', anchor: 'eyes', src: '/assets/emoji/1f453.png', width: 1.45 },
   { id: 'f-deal-with-it', anchor: 'eyes', src: '/assets/stickers/deal_with_it_glasses.webp', width: 1.5 },
   { id: 'f-shades', anchor: 'eyes', src: '/assets/emoji/1f576-fe0f.png', width: 1.45 },
-  { id: 'f-blush', anchor: 'cheeks', src: blush(345), width: 0.42, flat: true },
-  { id: 'f-blush-peach', anchor: 'cheeks', src: blush(18), width: 0.42, flat: true },
+  { id: 'f-blush', anchor: 'cheeks', src: blush(345), width: 0.42, flat: true, blend: 'multiply', alpha: 0.8 },
+  { id: 'f-blush-peach', anchor: 'cheeks', src: blush(18), width: 0.42, flat: true, blend: 'multiply', alpha: 0.8 },
+  { id: 'f-blush-heart', anchor: 'cheeks', src: '/assets/stickers/blush_k1.webp', width: 0.3, flat: true, blend: 'multiply', alpha: 0.8 },
+  { id: 'f-blush-anime', anchor: 'cheeks', src: '/assets/stickers/blush_k2.webp', width: 0.5, flat: true, blend: 'multiply', alpha: 0.8 },
+  { id: 'f-blush-lines', anchor: 'cheeks', src: '/assets/stickers/blush_k3.webp', width: 0.4, flat: true, blend: 'multiply', alpha: 0.8 },
+  { id: 'f-blush-kawaii', anchor: 'cheeks', src: '/assets/stickers/blush_k4.webp', width: 0.4, flat: true, blend: 'multiply', alpha: 0.8 },
   { id: 'f-heart', anchor: 'cheeks', src: '/assets/emoji/2764-fe0f.png', width: 0.2 },
   { id: 'f-star', anchor: 'cheeks', src: '/assets/emoji/2b50.png', width: 0.2 },
   { id: 'f-freckles', anchor: 'freckles', src: freckles, width: 0.8, flat: true },
@@ -63,21 +69,28 @@ const cache = new WeakMap()
 let landmarker = null
 
 function getLandmarker() {
-  landmarker ||= FilesetResolver.forVisionTasks('/mediapipe').then((fileset) =>
-    FaceLandmarker.createFromOptions(fileset, {
-      baseOptions: { modelAssetPath: '/mediapipe/face_landmarker.task' },
-      runningMode: 'IMAGE',
-      numFaces: MAX_FACES,
-      minFaceDetectionConfidence: 0.35,
-      minFacePresenceConfidence: 0.35,
-    }),
-  )
+  landmarker ||= import('@mediapipe/tasks-vision').then(async ({ FaceLandmarker, FilesetResolver }) => {
+    const fileset = await FilesetResolver.forVisionTasks('/mediapipe')
+    const make = (delegate) =>
+      FaceLandmarker.createFromOptions(fileset, {
+        baseOptions: { modelAssetPath: '/mediapipe/face_landmarker.task', delegate },
+        runningMode: 'IMAGE',
+        numFaces: MAX_FACES,
+        minFaceDetectionConfidence: 0.35,
+        minFacePresenceConfidence: 0.35,
+      })
+    return make('GPU').catch(() => make('CPU'))
+  })
   return landmarker
 }
 
+// Lets the browser paint and handle input between detection passes.
+const breathe = () => new Promise((r) => setTimeout(r, 0))
+
 export function warmUpFaces() {
-  FACE_STICKERS.forEach((s) => loadImage(s.src))
   getLandmarker().catch(() => { landmarker = null })
+  const idle = window.requestIdleCallback || ((fn) => setTimeout(fn, 300))
+  idle(() => FACE_STICKERS.forEach((s) => loadImage(s.src)))
 }
 
 const mid = (a, b) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 })
@@ -141,6 +154,7 @@ export async function detectFaces(shot) {
   for (const t of tiles(shot.width, shot.height)) {
     crop.width = crop.height = t.size
     crop.getContext('2d').drawImage(shot, t.x, t.y, t.size, t.size, 0, 0, t.size, t.size)
+    await breathe()
     collect(lm.detect(crop), t.size, t.size, t.x, t.y, t.size / 2, t.size / 2)
   }
   const faces = dedupe(found)
