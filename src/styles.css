@@ -132,6 +132,25 @@ img { -webkit-user-drag: none; }
   margin: 0 0 clamp(20px, 4dvh, 44px);
 }
 .start-row { display: flex; flex-wrap: wrap; gap: 20px; }
+.start-btn {
+  font-family: var(--pixel);
+  font-size: clamp(40px, min(6vw, 9dvh), 84px);
+  padding: 22px 64px;
+  min-height: 120px;
+  border-radius: 36px;
+  box-shadow: 0 10px 0 var(--ink);
+}
+.polaroid .live.sleeping {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 16px;
+  color: #fff;
+  font-family: var(--pixel);
+  font-size: 20px;
+  text-align: center;
+}
+.polaroid .live.sleeping img { width: 45%; opacity: 0.9; }
 
 .hero-visual {
   grid-area: visual;

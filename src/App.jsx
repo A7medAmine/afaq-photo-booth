@@ -16,11 +16,14 @@ const IDLE_WARN = 20
 const freshEdit = () => ({ frameId: 'circuit', filterId: 'none', caption: '', stickers: [], doodles: [], ink: [], colors: [], photo: { zoom: 1, ox: 0, oy: 0 } })
 
 export default function App() {
-  const cam = useCamera()
+  const [screen, setScreen] = useState('attract')
+  // The attract screen starts asleep; the guest presses START to wake the camera.
+  const [awake, setAwake] = useState(false)
+  const cam = useCamera(screen === 'capture' || (screen === 'attract' && awake))
+  const sleep = useCallback(() => setAwake(false), [])
   const { t } = useI18n()
   const custom = useCustomStickers()
   const [ready, setReady] = useState(false)
-  const [screen, setScreen] = useState('attract')
   const [layout, setLayout] = useState('single')
   const [shots, setShots] = useState([])
   const [edit, setEdit] = useState(freshEdit)
@@ -47,6 +50,7 @@ export default function App() {
 
   const reset = useCallback(() => {
     setScreen('attract')
+    setAwake(false)
     setShots([])
     setEdit(freshEdit())
     setFinal(null)
@@ -122,6 +126,9 @@ export default function App() {
   return (
     <Attract
       cam={cam}
+      awake={awake}
+      onWake={() => setAwake(true)}
+      onSleep={sleep}
       custom={custom}
       booth={booth}
       updateBooth={updateBooth}

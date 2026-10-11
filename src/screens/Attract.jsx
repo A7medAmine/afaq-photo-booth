@@ -8,6 +8,7 @@ import { FACE_STICKERS } from '../faces.js'
 import { setPin } from '../pin.js'
 import PinPad from './PinPad.jsx'
 import { LANGS, useI18n } from '../i18n.jsx'
+import { useIdle } from '../useIdle.js'
 
 const LIMIT_FIELDS = [
   ['maxEdits', 'Times a guest can go back to edit', 'times. 0 hides the button.'],
@@ -403,9 +404,13 @@ const FLOATERS = [
   ['plus_1000_aura', pos(22, { left: '34%', top: '0%' }, -5, 7)],
 ]
 
-export default function Attract({ cam, custom, booth, updateBooth, onStart, onTestPhotos }) {
+// With nobody choosing a layout for this long, the camera goes back to sleep.
+const AWAKE_MS = 60_000
+
+export default function Attract({ cam, awake, onWake, onSleep, custom, booth, updateBooth, onStart, onTestPhotos }) {
   const [stage, setStage] = useState(null)
   const { t, lang, setLang } = useI18n()
+  useIdle(awake && !stage, AWAKE_MS, onSleep)
 
   const useFiles = async (all) => {
     const files = [...all].filter((f) => f.type.startsWith('image/'))
@@ -439,10 +444,16 @@ export default function Attract({ cam, custom, booth, updateBooth, onStart, onTe
       <section className="hero-copy">
         <h1>{t('attract.title')}</h1>
         <p>{t('attract.lead')}</p>
-        <div className="start-row">
-          <button className="btn btn-sun big" onClick={() => onStart('single')}>{t('attract.single')}</button>
-          <button className="btn btn-pink big" onClick={() => onStart('strip')}>{t('attract.strip')}</button>
-        </div>
+        {awake ? (
+          <div className="start-row">
+            <button className="btn btn-sun big" onClick={() => onStart('single')}>{t('attract.single')}</button>
+            <button className="btn btn-pink big" onClick={() => onStart('strip')}>{t('attract.strip')}</button>
+          </div>
+        ) : (
+          <div className="start-row">
+            <button className="btn btn-sun start-btn" onClick={onWake}>{t('attract.start')}</button>
+          </div>
+        )}
       </section>
 
       <section className="hero-visual" aria-hidden="true">
@@ -451,8 +462,15 @@ export default function Attract({ cam, custom, booth, updateBooth, onStart, onTe
         ))}
         <div className="polaroid">
           <span className="tape" />
-          <VideoView stream={cam.stream} mirror={cam.settings.mirror} className="live" />
-          <div className="polaroid-cap">{t('attract.live')}</div>
+          {awake && cam.stream ? (
+            <VideoView stream={cam.stream} mirror={cam.settings.mirror} className="live" />
+          ) : (
+            <div className="live sleeping">
+              <img src="/assets/main.webp" alt="" />
+              {awake && <span>{t('attract.waking')}</span>}
+            </div>
+          )}
+          <div className="polaroid-cap">{awake ? t('attract.live') : t('attract.ready')}</div>
         </div>
       </section>
 
@@ -462,7 +480,7 @@ export default function Attract({ cam, custom, booth, updateBooth, onStart, onTe
           <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" />
         </svg>
       </button>
-      {stage === 'pin' && <PinPad onCancel={() => setStage(null)} onUnlock={() => setStage('settings')} />}
+      {stage === 'pin' && <PinPad onCancel={() => setStage(null)} onUnlock={() => { onWake(); setStage('settings') }} />}
       {stage === 'settings' && (
         <Settings
           cam={cam}

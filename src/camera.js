@@ -212,7 +212,14 @@ export function makePhoneStream(baseUrl, onStatus, beforeRetry) {
   return stream
 }
 
-export function useCamera() {
+// Tells the phone app to close its camera now instead of after its grace period.
+// Older phone apps answer 404, which is fine.
+function sleepPhone(base) {
+  fetchTimeout(`${base}/sleep`, 3000, { method: 'POST' }).catch(() => {})
+}
+
+// The camera only runs while `active`, so the webcam light and the phone stay off between guests.
+export function useCamera(active = true) {
   const [settings, setSettings] = useState(loadSettings)
   const [stream, setStream] = useState(null)
   const [devices, setDevices] = useState([])
@@ -246,6 +253,18 @@ export function useCamera() {
       setStream(s)
     }
     const showDemo = () => swap(makeDemoStream(), true)
+
+    if (!active) {
+      const wasOn = !!current.current
+      current.current?.getTracks().forEach((t) => t.stop())
+      current.current = null
+      setStream(null)
+      setDemo(false)
+      setPhoneStatus('idle')
+      setError('')
+      if (wasOn && phoneBase && !forceDemo) sleepPhone(phoneBase)
+      return
+    }
 
     async function startPhone() {
       if (!onDemo) setPhoneStatus('connecting')
@@ -296,7 +315,7 @@ export function useCamera() {
       cancelled = true
       clearTimeout(retry)
     }
-  }, [settings.deviceId, phoneBase, usb, attempt])
+  }, [settings.deviceId, phoneBase, usb, attempt, active])
 
   const reconnect = useCallback(() => setAttempt((n) => n + 1), [])
 
