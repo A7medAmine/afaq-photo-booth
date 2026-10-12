@@ -18,7 +18,7 @@ function thumbUrl(shot) {
   return new Promise((r) => c.toBlob((b) => r(b ? URL.createObjectURL(b) : ''), 'image/jpeg', 0.7))
 }
 
-export default function Capture({ cam, layout, onDone, onCancel }) {
+export default function Capture({ cam, layout, countdown = 3, onDone, onCancel }) {
   const L = LAYOUTS[layout]
   const { t } = useI18n()
   const videoRef = useRef(null)
@@ -53,9 +53,10 @@ export default function Capture({ cam, layout, onDone, onCancel }) {
       for (let i = 0; i < L.shots; i++) {
         if (dead) return
         setIndex(i)
-        for (let c = 3; c >= 1; c--) {
+        for (let c = countdown; c >= 1; c--) {
           setCount(c)
-          beep(520 + (3 - c) * 120, 140)
+          // Pitch climbs over the last three seconds only, however long the countdown.
+          beep(520 + Math.max(0, 3 - c) * 120, 140)
           await wait(1000)
           if (dead) return
         }

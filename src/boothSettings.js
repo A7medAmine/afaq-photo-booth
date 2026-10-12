@@ -9,6 +9,7 @@ export const SESSION_DEFAULTS = {
   extendSeconds: 30,
   doneSeconds: 60,
   editIdleSeconds: 120,
+  countdownSeconds: 3,
 }
 
 export const SESSION_LIMITS = {
@@ -17,6 +18,7 @@ export const SESSION_LIMITS = {
   extendSeconds: [10, 300],
   doneSeconds: [15, 600],
   editIdleSeconds: [30, 900],
+  countdownSeconds: [3, 10],
 }
 
 function load() {

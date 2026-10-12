@@ -10,6 +10,8 @@ import PinPad from './PinPad.jsx'
 import { LANGS, useI18n } from '../i18n.jsx'
 import { useIdle } from '../useIdle.js'
 
+const COUNTDOWN_PRESETS = [3, 5, 7, 10]
+
 const LIMIT_FIELDS = [
   ['maxEdits', 'Times a guest can go back to edit', 'times. 0 hides the button.'],
   ['maxExtends', 'Times a guest can extend the reset timer', 'times. 0 hides the button.'],
@@ -207,6 +209,22 @@ function Settings({ cam, custom, booth, updateBooth, onClose, onTestFiles }) {
           </p>
         )}
         <CameraHealth cam={cam} />
+        <div className="field">
+          Photo countdown
+          <div className="row-tight" role="group" aria-label="Photo countdown">
+            {COUNTDOWN_PRESETS.map((n) => (
+              <button
+                key={n}
+                className={`btn ${booth.countdownSeconds === n ? 'btn-sun' : 'btn-ghost'}`}
+                aria-pressed={booth.countdownSeconds === n}
+                onClick={() => updateBooth({ countdownSeconds: n })}
+              >
+                {n} s
+              </button>
+            ))}
+          </div>
+          <span className="note">Seconds counted down before each shot.</span>
+        </div>
         <div className="field">
           Guest session limits
           {LIMIT_FIELDS.map(([key, label, unit]) => (
@@ -444,6 +462,7 @@ export default function Attract({ cam, awake, onWake, onSleep, custom, booth, up
       <section className="hero-copy">
         <h1>{t('attract.title')}</h1>
         <p>{t('attract.lead')}</p>
+        <p className="privacy">{t('attract.privacy')}</p>
         {awake ? (
           <div className="start-row">
             <button className="btn btn-sun big" onClick={() => onStart('single')}>{t('attract.single')}</button>

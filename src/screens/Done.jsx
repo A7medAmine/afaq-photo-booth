@@ -125,6 +125,7 @@ export default function Done({ final, share, onShare, booth, editsLeft, extendsL
             <p>{t('done.scanBody')}</p>
             {fullStatus === 'sending' && <p className="note" role="status">{t('done.fullSending')}</p>}
             {fullStatus === 'failed' && <p className="note" role="status">{t('done.fullFailed')}</p>}
+            <p className="privacy">{t('done.privacy')}</p>
             <label className="keep">
               <input type="checkbox" checked={keep} onChange={(e) => toggleKeep(e.target.checked)} />
               <span>

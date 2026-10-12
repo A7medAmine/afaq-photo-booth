@@ -67,6 +67,7 @@ export default function App() {
       <Capture
         cam={cam}
         layout={layout}
+        countdown={booth.countdownSeconds}
         onCancel={reset}
         onDone={(s) => {
           setShots(s)

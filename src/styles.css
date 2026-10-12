@@ -131,6 +131,7 @@ img { -webkit-user-drag: none; }
   max-width: 24em;
   margin: 0 0 clamp(20px, 4dvh, 44px);
 }
+.hero-copy p.privacy { font-size: clamp(15px, min(1.5vw, 2.4dvh), 20px); font-weight: 700; opacity: 0.9; }
 .start-row { display: flex; flex-wrap: wrap; gap: 20px; }
 .start-btn {
   font-family: var(--pixel);
@@ -937,6 +938,7 @@ html[lang="ar"] .panel-foot .btn.big { font-size: 28px; padding: 10px 14px; }
 }
 
 /* Guest photo retention, idle warning, operator health and limits */
+.done-info .privacy { margin: 0; max-width: 28em; font-weight: 800; font-size: clamp(16px, 1.5vw, 22px); }
 .keep { display: flex; align-items: flex-start; gap: 14px; max-width: 28em; text-align: start; font-weight: 700; font-size: clamp(16px, 1.5vw, 22px); cursor: pointer; }
 .keep input { width: 30px; height: 30px; flex: none; accent-color: var(--sun); margin-top: 2px; }
 .keep small { display: block; margin-top: 4px; font-weight: 500; font-size: 0.8em; opacity: 0.9; }

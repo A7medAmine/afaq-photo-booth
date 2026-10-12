@@ -213,7 +213,7 @@ const photoView = (id, left) => `
 <p>Save your picture to your phone.</p>
 <a class="btn" href="/files/${id}.jpg?dl=1" download>Download full quality</a>
 <a class="alt" href="/files/${id}.jpg?size=preview&dl=1" download>Smaller file, quicker to share</a>
-<small>${left ? `Your photo is deleted from our server in about ${left} minute${left === 1 ? '' : 's'}, so download it now.` : ''} Tip: on iPhone, press and hold the photo and choose Add to Photos.</small>`
+<small>We never keep your photo unless you ask us to. ${left ? `This one is deleted from our server in about ${left} minute${left === 1 ? '' : 's'}, so download it now.` : 'You chose to let the club keep this one.'} Tip: on iPhone, press and hold the photo and choose Add to Photos.</small>`
 
 const notFound = (home) => `
 <h1>${home ? 'AFAQ Photo Booth' : 'Photo not found'}</h1>
