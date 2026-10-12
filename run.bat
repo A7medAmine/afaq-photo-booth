@@ -1,6 +1,11 @@
 @echo off
-rem One-click start: ensure adb, forward phone camera over USB, install deps, start booth + cloud.
+rem One-click start: ensure Node + adb, forward phone camera over USB, install deps, build and serve booth + cloud.
 cd /d "%~dp0"
+
+call scripts\install-node.bat
+if errorlevel 1 exit /b 1
+rem portable Node from a fresh install may not be on PATH yet in this session
+where node >nul 2>&1 || set "PATH=%LOCALAPPDATA%\nodejs;%PATH%"
 
 call scripts\install-adb.bat
 if errorlevel 1 exit /b 1
@@ -20,4 +25,4 @@ if not exist cloud\node_modules (
   call npm --prefix cloud install || exit /b 1
 )
 
-call npm run dev
+call npm start

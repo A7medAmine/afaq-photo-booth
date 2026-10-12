@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "concurrently -k -n booth,cloud -c blue,magenta \"vite\" \"npm --prefix cloud start\"",
+    "start": "vite build && concurrently -k -n booth,cloud -c blue,magenta \"vite preview\" \"npm --prefix cloud start\"",
     "booth": "vite",
     "cloud": "npm --prefix cloud start",
     "build": "vite build",

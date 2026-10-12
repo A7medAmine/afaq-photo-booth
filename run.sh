@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
-# One-click start: ensure adb, forward phone camera over USB, install deps, start booth + cloud.
+# One-click start: ensure Node + adb, forward phone camera over USB, install deps, build and serve booth + cloud.
 cd "$(dirname "$0")" || exit 1
+
+bash scripts/install-node.sh || exit 1
+# portable Node installs into ~/.local/node; prefer it when present
+[ -x "$HOME/.local/node/bin/node" ] && export PATH="$HOME/.local/node/bin:$PATH"
 
 bash scripts/install-adb.sh || exit 1
 # fresh zip install may not be on PATH yet
@@ -11,4 +15,4 @@ bash scripts/phone-usb.sh || echo "Continuing without phone forward..."
 [ -d node_modules ] || { echo "Installing booth deps..."; npm install || exit 1; }
 [ -d cloud/node_modules ] || { echo "Installing cloud deps..."; npm --prefix cloud install || exit 1; }
 
-npm run dev
+npm start
