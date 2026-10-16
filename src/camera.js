@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 const LS = 'afaq-booth-camera'
-const DEFAULTS = { deviceId: '', mirror: true, source: 'device', phoneUrl: '', phoneMode: 'wifi' }
+const DEFAULTS = { deviceId: '', mirror: true, source: 'device', phoneUrl: '', phoneMode: 'wifi', phoneSerial: '' }
 const FRAME_STALL_MS = 5000
 const RETRY_MS = 3000
 
@@ -34,18 +34,48 @@ export function phoneBaseOf(settings) {
 }
 
 // The browser cannot run adb, so the local booth server sets up the USB forward.
-export async function setupUsb() {
+export async function setupUsb(serial = '') {
   let r
   try {
-    r = await fetchTimeout('/api/phone/usb', 10000, { method: 'POST' })
+    r = await fetchTimeout('/api/phone/usb', 10000, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ serial }),
+    })
   } catch {
     throw new Error('Booth server not reachable')
   }
   if (!r.ok) throw new Error((await r.json().catch(() => null))?.error || 'USB setup failed')
 }
 
-export async function testPhone(rawUrl, usb = false) {
-  if (usb) await setupUsb()
+// Phones plugged in by USB, as adb sees them, each with the camera app's /health when it answers.
+export async function listUsbPhones() {
+  let r
+  try {
+    r = await fetchTimeout('/api/phone/usb', 20000)
+  } catch {
+    throw new Error('Booth server not reachable')
+  }
+  const j = await r.json().catch(() => null)
+  if (!j) throw new Error('Booth server not reachable')
+  if (!j.ok) throw new Error(j.error || 'USB check failed')
+  return { phones: j.phones, hint: j.hint }
+}
+
+// Camera apps answering on port 8080 anywhere on this computer's local networks.
+export async function scanWifiPhones() {
+  let r
+  try {
+    r = await fetchTimeout('/api/phone/scan', 30000)
+  } catch {
+    throw new Error('Booth server not reachable')
+  }
+  if (!r.ok) throw new Error('Network scan failed')
+  return (await r.json()).phones
+}
+
+export async function testPhone(rawUrl, usb = false, serial = '') {
+  if (usb) await setupUsb(serial)
   const base = usb ? USB_URL : normalizePhoneUrl(rawUrl)
   if (!base) throw new Error('Enter the phone address first')
   let r
@@ -239,6 +269,7 @@ export function useCamera(active = true) {
 
   const phoneBase = phoneBaseOf(settings)
   const usb = settings.phoneMode === 'usb'
+  const serial = usb ? settings.phoneSerial : ''
 
   useEffect(() => {
     let cancelled = false
@@ -270,7 +301,7 @@ export function useCamera(active = true) {
       if (!onDemo) setPhoneStatus('connecting')
       setError('')
       try {
-        await testPhone(phoneBase, usb)
+        await testPhone(phoneBase, usb, serial)
       } catch (e) {
         if (cancelled) return
         setError(e.message)
@@ -280,7 +311,7 @@ export function useCamera(active = true) {
         return
       }
       if (cancelled) return
-      swap(makePhoneStream(phoneBase, (st) => !cancelled && setPhoneStatus(st), usb ? () => setupUsb().catch(() => {}) : undefined), false)
+      swap(makePhoneStream(phoneBase, (st) => !cancelled && setPhoneStatus(st), usb ? () => setupUsb(serial).catch(() => {}) : undefined), false)
     }
 
     async function startDevice() {
@@ -315,7 +346,7 @@ export function useCamera(active = true) {
       cancelled = true
       clearTimeout(retry)
     }
-  }, [settings.deviceId, phoneBase, usb, attempt, active])
+  }, [settings.deviceId, phoneBase, usb, serial, attempt, active])
 
   const reconnect = useCallback(() => setAttempt((n) => n + 1), [])
 
@@ -338,29 +369,30 @@ export function capture(video, mirror) {
 // Shots stay at camera resolution; this only guards against absurd sizes from imported files.
 const MAX_SHOT_SIDE = 8000
 
-export async function grabStill(cam, video, mirror) {
-  const fromPreview = () => (video?.videoWidth ? capture(video, mirror) : null)
-  if (cam.settings.source !== 'phone' || cam.phoneStatus !== 'live') return fromPreview()
-  const preview = fromPreview()
-  try {
-    const r = await fetchTimeout(`${phoneBaseOf(cam.settings)}/photo`, 10000)
-    if (!r.ok) throw new Error(`Photo status ${r.status}`)
-    const bmp = await createImageBitmap(await r.blob())
-    const k = Math.min(1, MAX_SHOT_SIDE / Math.max(bmp.width, bmp.height))
-    const c = document.createElement('canvas')
-    c.width = Math.round(bmp.width * k)
-    c.height = Math.round(bmp.height * k)
-    const ctx = c.getContext('2d')
-    if (mirror) {
-      ctx.translate(c.width, 0)
-      ctx.scale(-1, 1)
-    }
-    ctx.drawImage(bmp, 0, 0, c.width, c.height)
-    bmp.close()
-    return c
-  } catch {
-    return preview
+// Returns the preview frame at once, for instant feedback, and a promise of the full-quality
+// shot: the phone's own photo when it is live, else that same preview frame.
+export function grabStill(cam, video, mirror) {
+  const preview = video?.videoWidth ? capture(video, mirror) : null
+  if (cam.settings.source !== 'phone' || cam.phoneStatus !== 'live') return { preview, full: Promise.resolve(preview) }
+  return { preview, full: phonePhoto(cam, mirror).catch(() => preview) }
+}
+
+async function phonePhoto(cam, mirror) {
+  const r = await fetchTimeout(`${phoneBaseOf(cam.settings)}/photo`, 10000)
+  if (!r.ok) throw new Error(`Photo status ${r.status}`)
+  const bmp = await createImageBitmap(await r.blob())
+  const k = Math.min(1, MAX_SHOT_SIDE / Math.max(bmp.width, bmp.height))
+  const c = document.createElement('canvas')
+  c.width = Math.round(bmp.width * k)
+  c.height = Math.round(bmp.height * k)
+  const ctx = c.getContext('2d')
+  if (mirror) {
+    ctx.translate(c.width, 0)
+    ctx.scale(-1, 1)
   }
+  ctx.drawImage(bmp, 0, 0, c.width, c.height)
+  bmp.close()
+  return c
 }
 
 export async function fileToShot(file) {

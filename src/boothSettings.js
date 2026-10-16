@@ -10,6 +10,17 @@ export const SESSION_DEFAULTS = {
   doneSeconds: 60,
   editIdleSeconds: 120,
   countdownSeconds: 3,
+  // 1 waits for a 👍 (or a secret sign) before each countdown, 0 starts it straight away.
+  gestureShutter: 1,
+  gestureWaitSeconds: 10,
+  // 1 lets guests pinch with one hand to zoom in and out.
+  gestureZoom: 1,
+  // 1 draws the tracked hand joints over the preview so guests see what is detected.
+  showHandTracking: 0,
+  // 1 lets guests on the start screen make a frame with both hands to pick one big photo.
+  frameStart: 1,
+  // 1 plays sound effects (button taps, countdown, shutter, chimes).
+  sound: 1,
 }
 
 export const SESSION_LIMITS = {
@@ -19,6 +30,12 @@ export const SESSION_LIMITS = {
   doneSeconds: [15, 600],
   editIdleSeconds: [30, 900],
   countdownSeconds: [3, 10],
+  gestureShutter: [0, 1],
+  gestureWaitSeconds: [3, 60],
+  gestureZoom: [0, 1],
+  showHandTracking: [0, 1],
+  frameStart: [0, 1],
+  sound: [0, 1],
 }
 
 function load() {

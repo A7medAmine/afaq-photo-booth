@@ -2,6 +2,7 @@ import express from 'express'
 import fs from 'node:fs'
 import path from 'node:path'
 import crypto from 'node:crypto'
+import os from 'node:os'
 import { execFile } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 
@@ -29,17 +30,133 @@ app.use((req, res, next) => {
   next()
 })
 
-app.post('/api/phone/usb', (req, res) => {
-  const ip = req.socket.remoteAddress || ''
-  if (!/^(::1|127\.0\.0\.1|::ffff:127\.0\.0\.1)$/.test(ip)) return res.sendStatus(403)
-  execFile('adb', ['forward', 'tcp:8080', 'tcp:8080'], { timeout: 8000 }, (err, _out, stderr) => {
-    if (!err) return res.json({ ok: true })
-    const missing = err.code === 'ENOENT'
-    const msg = missing
-      ? 'adb is not installed on this computer'
-      : (stderr || '').trim() || 'No phone found. Plug it in and allow USB debugging'
-    res.status(500).json({ ok: false, error: msg })
+const PHONE_PORT = 8080
+const isLocal = (req) => /^(::1|127\.0\.0\.1|::ffff:127\.0\.0\.1)$/.test(req.socket.remoteAddress || '')
+
+function adb(args, timeout = 8000) {
+  return new Promise((resolve, reject) => {
+    execFile('adb', args, { timeout }, (err, out, stderr) => {
+      if (!err) return resolve(out)
+      reject(new Error(err.code === 'ENOENT' ? 'adb is not installed on this computer' : (stderr || '').trim() || err.message))
+    })
   })
+}
+
+// Lines of `adb devices -l` look like: R58M12ABCDE  device product:x model:SM_A525F device:y transport_id:1
+async function usbPhones() {
+  const out = await adb(['devices', '-l'])
+  return out
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter((l) => l && !l.startsWith('*') && !l.startsWith('List of'))
+    .map((l) => {
+      const [serial, state] = l.split(/\s+/)
+      return { serial, state, model: /model:(\S+)/.exec(l)?.[1]?.replace(/_/g, ' ') || serial }
+    })
+}
+
+function usbHint(phones) {
+  if (phones.some((p) => p.state === 'unauthorized')) return 'Tap Allow on the phone to trust this computer, then try again'
+  if (phones.some((p) => p.state === 'offline')) return 'The phone is offline. Unplug it and plug it back in'
+  return 'No phone found. Plug it in and allow USB debugging'
+}
+
+async function probeHealth(base, ms) {
+  try {
+    const r = await fetch(`${base}/health`, { signal: AbortSignal.timeout(ms) })
+    if (!r.ok) return null
+    const h = await r.json()
+    return h?.ok ? h : null
+  } catch {
+    return null
+  }
+}
+
+// Checks whether the camera app answers on one phone without touching the booth's own port 8080.
+async function usbAppHealth(serial) {
+  try {
+    const port = (await adb(['-s', serial, 'forward', 'tcp:0', `tcp:${PHONE_PORT}`])).trim()
+    if (!/^\d+$/.test(port)) return null
+    const h = await probeHealth(`http://127.0.0.1:${port}`, 2500)
+    adb(['-s', serial, 'forward', '--remove', `tcp:${port}`]).catch(() => {})
+    return h
+  } catch {
+    return null
+  }
+}
+
+// Every address in the /24 of each private network this computer is on, its own included
+// so `npm run fake-phone` shows up too. A phone hotspot puts the phone at .1 of that range.
+function lanHosts() {
+  const hosts = new Set()
+  const own = new Set()
+  for (const list of Object.values(os.networkInterfaces())) {
+    for (const a of list || []) {
+      if (a.family !== 'IPv4' || a.internal) continue
+      if (!/^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(a.address)) continue
+      own.add(a.address)
+      const prefix = a.address.split('.').slice(0, 3).join('.')
+      for (let i = 1; i < 255; i++) hosts.add(`${prefix}.${i}`)
+    }
+  }
+  return { hosts: [...hosts], own }
+}
+
+async function scanLan() {
+  const { hosts, own } = lanHosts()
+  const found = []
+  let ownFound = false
+  let next = 0
+  const worker = async () => {
+    while (next < hosts.length) {
+      const host = hosts[next++]
+      const url = `http://${host}:${PHONE_PORT}`
+      const health = await probeHealth(url, 900)
+      if (!health) continue
+      // This computer answers on each of its networks; list it once.
+      if (own.has(host)) {
+        if (ownFound) continue
+        ownFound = true
+      }
+      found.push({ url, health, self: own.has(host) })
+    }
+  }
+  await Promise.all(Array.from({ length: 128 }, worker))
+  return found.sort((a, b) => a.url.localeCompare(b.url, undefined, { numeric: true }))
+}
+
+app.get('/api/phone/usb', async (req, res) => {
+  if (!isLocal(req)) return res.sendStatus(403)
+  try {
+    const phones = await usbPhones()
+    await Promise.all(phones.map(async (p) => {
+      p.health = p.state === 'device' ? await usbAppHealth(p.serial) : null
+    }))
+    res.json({ ok: true, phones, hint: phones.some((p) => p.state === 'device') ? '' : usbHint(phones) })
+  } catch (e) {
+    res.json({ ok: false, phones: [], error: e.message })
+  }
+})
+
+app.get('/api/phone/scan', async (req, res) => {
+  if (!isLocal(req)) return res.sendStatus(403)
+  res.json({ ok: true, phones: await scanLan() })
+})
+
+// Forwards the chosen phone to localhost:8080. A phone that is no longer plugged in is
+// replaced by the only phone that is, so a swapped phone still connects on its own.
+app.post('/api/phone/usb', express.json(), async (req, res) => {
+  if (!isLocal(req)) return res.sendStatus(403)
+  try {
+    const phones = await usbPhones()
+    const ready = phones.filter((p) => p.state === 'device')
+    const pick = ready.find((p) => p.serial === req.body?.serial) || (ready.length === 1 ? ready[0] : null)
+    if (!pick) throw new Error(ready.length ? 'Several phones are plugged in. Choose one with Find cameras' : usbHint(phones))
+    await adb(['-s', pick.serial, 'forward', `tcp:${PHONE_PORT}`, `tcp:${PHONE_PORT}`])
+    res.json({ ok: true, serial: pick.serial, model: pick.model })
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message })
+  }
 })
 
 const newId = () => crypto.randomBytes(6).toString('base64url')

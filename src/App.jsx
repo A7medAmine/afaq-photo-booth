@@ -2,10 +2,12 @@ import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
 import { useCamera } from './camera.js'
 import { fontsReady, preloadAll } from './compose.js'
 import { warmUpFaces } from './faces.js'
+import { warmUpGestures } from './gestures.js'
 import { useCustomStickers } from './customStickers.js'
 import { useIdle } from './useIdle.js'
 import { useBoothSettings } from './boothSettings.js'
 import { useI18n } from './i18n.jsx'
+import { setSoundOn, sfx } from './sound.js'
 import Attract from './screens/Attract.jsx'
 import Capture from './screens/Capture.jsx'
 const Edit = lazy(() => import('./screens/Edit.jsx'))
@@ -42,8 +44,22 @@ export default function App() {
     }
   }, [])
 
+  useEffect(() => setSoundOn(booth.sound), [booth.sound])
+
+  // Every button gives a tap sound, except ones that play their own (marked data-sfx="none").
+  useEffect(() => {
+    const tap = (e) => {
+      const b = e.target.closest?.('button, a.btn')
+      if (!b || b.disabled || b.closest('[data-sfx="none"]')) return
+      sfx.tap(b.classList.contains('big'))
+    }
+    window.addEventListener('pointerdown', tap)
+    return () => window.removeEventListener('pointerdown', tap)
+  }, [])
+
   useEffect(() => {
     warmUpFaces()
+    warmUpGestures()
     import('./screens/Edit.jsx')
     Promise.all([fontsReady(), preloadAll()]).finally(() => setReady(true))
   }, [])
@@ -59,6 +75,10 @@ export default function App() {
   }, [])
 
   const idleLeft = useIdle(screen === 'edit', booth.editIdleSeconds * 1000, reset, IDLE_WARN * 1000)
+  const warning = idleLeft != null
+  useEffect(() => {
+    if (warning) sfx.nudge()
+  }, [warning])
 
   if (!ready) return <div className="boot">{t('boot')}</div>
 
@@ -68,9 +88,14 @@ export default function App() {
         cam={cam}
         layout={layout}
         countdown={booth.countdownSeconds}
+        gestureWait={booth.gestureShutter ? booth.gestureWaitSeconds : 0}
+        gestureZoom={!!booth.gestureZoom}
+        showHands={!!booth.showHandTracking && !!(booth.gestureShutter || booth.gestureZoom)}
         onCancel={reset}
-        onDone={(s) => {
+        onDone={(s, theme) => {
           setShots(s)
+          // A secret sign (✌️ or the clone jutsu) unlocks a theme: its frame is picked and its face art goes on (see Edit.jsx).
+          if (theme) setEdit((e) => ({ ...e, theme, frameId: theme, themeFaces: false }))
           setScreen('edit')
         }}
       />

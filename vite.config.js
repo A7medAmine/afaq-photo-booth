@@ -5,6 +5,8 @@ const proxy = { '/api': 'http://localhost:8787' }
 
 export default defineConfig({
   plugins: [react()],
+  // The hand-gesture worker is created with type: 'module'.
+  worker: { format: 'es' },
   server: {
     host: true,
     port: 5173,

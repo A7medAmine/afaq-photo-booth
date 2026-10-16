@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import QRCode from 'qrcode'
 import { useI18n } from '../i18n.jsx'
+import { sfx } from '../sound.js'
 
 const CLOUD = (import.meta.env.VITE_CLOUD_URL || '').replace(/\/$/, '')
 const KEY = import.meta.env.VITE_UPLOAD_KEY || ''
@@ -57,8 +58,10 @@ export default function Done({ final, share, onShare, booth, editsLeft, extendsL
       sendFull(id, token)
       setQr(await QRCode.toDataURL(url, { width: 640, margin: 1, color: { dark: '#030a2e', light: '#ffffff' } }))
       setStatus('ready')
+      sfx.success()
     } catch {
       setStatus('error')
+      sfx.error()
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [final])

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import VideoView from '../VideoView.jsx'
 import { fileToShot, normalizePhoneUrl, readHealth, testPhone } from '../camera.js'
 import { SESSION_LIMITS } from '../boothSettings.js'
@@ -7,10 +7,14 @@ import { groupOf } from '../customStickers.js'
 import { FACE_STICKERS } from '../faces.js'
 import { setPin } from '../pin.js'
 import PinPad from './PinPad.jsx'
+import CameraPicker from './CameraPicker.jsx'
 import { LANGS, useI18n } from '../i18n.jsx'
 import { useIdle } from '../useIdle.js'
+import { showHands, watchFrame } from '../gestures.js'
+import { sfx } from '../sound.js'
 
 const COUNTDOWN_PRESETS = [3, 5, 7, 10]
+const GESTURE_WAIT_PRESETS = [5, 10, 20, 30]
 
 const LIMIT_FIELDS = [
   ['maxEdits', 'Times a guest can go back to edit', 'times. 0 hides the button.'],
@@ -89,12 +93,14 @@ function Settings({ cam, custom, booth, updateBooth, onClose, onTestFiles }) {
   const [phoneUrl, setPhoneUrl] = useState(settings.phoneUrl)
   const [test, setTest] = useState('')
   const [testing, setTesting] = useState(false)
+  const [picking, setPicking] = useState(false)
   useEffect(() => { setTest('') }, [settings.source])
+  useEffect(() => { setPhoneUrl(settings.phoneUrl) }, [settings.phoneUrl])
   const runTest = async () => {
     setTesting(true)
     setTest('')
     try {
-      const h = await testPhone(phoneUrl, settings.phoneMode === 'usb')
+      const h = await testPhone(phoneUrl, settings.phoneMode === 'usb', settings.phoneSerial)
       setTest(`Connected: ${h.camera} camera, ${h.width}x${h.height}`)
     } catch (e) {
       setTest(e.message)
@@ -123,10 +129,11 @@ function Settings({ cam, custom, booth, updateBooth, onClose, onTestFiles }) {
   const [newPin, setNewPin] = useState('')
   const [pinSaved, setPinSaved] = useState(false)
   useEffect(() => {
+    if (picking) return
     const k = (e) => e.key === 'Escape' && onClose()
     window.addEventListener('keydown', k)
     return () => window.removeEventListener('keydown', k)
-  }, [onClose])
+  }, [onClose, picking])
   return (
     <div className="modal" role="dialog" aria-modal="true" aria-label="Operator settings">
       <div className="modal-card settings-card">
@@ -134,6 +141,11 @@ function Settings({ cam, custom, booth, updateBooth, onClose, onTestFiles }) {
           <h2>Operator settings</h2>
           <button className="btn btn-sun modal-x" aria-label="Close settings" onClick={onClose}>✕ Close</button>
         </header>
+        {picking && <CameraPicker cam={cam} onClose={() => setPicking(false)} />}
+        <div className="field">
+          <button className="btn btn-sun find-cams" onClick={() => setPicking(true)}>Find cameras and phones</button>
+          <span className="note">Searches USB, Wi-Fi and this computer, then lets you pick one. Or set it up by hand below.</span>
+        </div>
         <label className="field">
           Camera source
           <select value={settings.source} onChange={(e) => update({ source: e.target.value })}>
@@ -205,7 +217,7 @@ function Settings({ cam, custom, booth, updateBooth, onClose, onTestFiles }) {
         </label>
         {demo && (
           <p className="note">
-            Showing the demo camera. {error ? `Reason: ${error}.` : ''} {settings.source === 'device' ? 'Plug in a camera and choose it above.' : 'Check the phone address above.'}
+            Showing the demo camera. {error ? `Reason: ${error}.` : ''} {settings.source === 'device' ? 'Plug in a camera and choose it above.' : 'Press Find cameras and phones above.'}
           </p>
         )}
         <CameraHealth cam={cam} />
@@ -225,6 +237,57 @@ function Settings({ cam, custom, booth, updateBooth, onClose, onTestFiles }) {
           </div>
           <span className="note">Seconds counted down before each shot.</span>
         </div>
+        <div className="field">
+          <label className="check">
+            <input type="checkbox" checked={!!booth.gestureShutter} onChange={(e) => updateBooth({ gestureShutter: e.target.checked ? 1 : 0 })} />
+            Hand-sign shutter: guests show 👍 to start the countdown (✌️ also works and secretly unlocks the Palestine theme; the Naruto clone jutsu sign, two fingers of each hand crossed, unlocks the Naruto theme)
+          </label>
+          {!!booth.gestureShutter && (
+            <div className="row-tight" role="group" aria-label="Longest wait for a hand sign">
+              {GESTURE_WAIT_PRESETS.map((n) => (
+                <button
+                  key={n}
+                  className={`btn ${booth.gestureWaitSeconds === n ? 'btn-sun' : 'btn-ghost'}`}
+                  aria-pressed={booth.gestureWaitSeconds === n}
+                  onClick={() => updateBooth({ gestureWaitSeconds: n })}
+                >
+                  {n} s
+                </button>
+              ))}
+            </div>
+          )}
+          <span className="note">After each shot guests see it and can show 👎 to retake it or 👍 to keep it. If nobody shows a sign, the booth carries on by itself after the chosen wait. Detection runs on this computer only; no video is sent anywhere.</span>
+        </div>
+        <div className="field">
+          <label className="check">
+            <input type="checkbox" checked={!!booth.gestureZoom} onChange={(e) => updateBooth({ gestureZoom: e.target.checked ? 1 : 0 })} />
+            Pinch zoom: guests fold three fingers and spread or close thumb and index to zoom (up to 3×)
+          </label>
+          <span className="note">Digital zoom crops the middle of the picture, so zoomed shots have fewer pixels.</span>
+        </div>
+        <div className="field">
+          <label className="check">
+            <input type="checkbox" checked={!!booth.frameStart} onChange={(e) => updateBooth({ frameStart: e.target.checked ? 1 : 0 })} />
+            Frame sign: after START, guests make a frame with both hands to go straight to one big photo
+          </label>
+        </div>
+        <div className="field">
+          <label className="check">
+            <input type="checkbox" checked={!!booth.sound} onChange={(e) => updateBooth({ sound: e.target.checked ? 1 : 0 })} />
+            Sound effects: taps, countdown beeps, shutter click and chimes
+          </label>
+          {!!booth.sound && <button className="btn btn-ghost" data-sfx="none" onClick={sfx.success}>Test sound</button>}
+          <span className="note">No sound? Check the computer's volume and that this browser tab is not muted.</span>
+        </div>
+        {!!(booth.gestureShutter || booth.gestureZoom || booth.frameStart) && (
+          <div className="field">
+            <label className="check">
+              <input type="checkbox" checked={!!booth.showHandTracking} onChange={(e) => updateBooth({ showHandTracking: e.target.checked ? 1 : 0 })} />
+              Show hand tracking: green joints and dots on each hand, labelled with the sign it reads
+            </label>
+            <span className="note">Shows guests how the booth sees their hands. Only on screen; the overlay is never in the photo.</span>
+          </div>
+        )}
         <div className="field">
           Guest session limits
           {LIMIT_FIELDS.map(([key, label, unit]) => (
@@ -429,6 +492,33 @@ export default function Attract({ cam, awake, onWake, onSleep, custom, booth, up
   const [stage, setStage] = useState(null)
   const { t, lang, setLang } = useI18n()
   useIdle(awake && !stage, AWAKE_MS, onSleep)
+  const videoRef = useRef(null)
+  const [frameHold, setFrameHold] = useState(0)
+  const live = awake && !!cam.stream
+  const framing = live && !!booth.frameStart && !stage
+  const startRef = useRef(onStart)
+  startRef.current = onStart
+
+  // Both hands in an L at opposite corners, like framing a shot, picks one big photo.
+  useEffect(() => {
+    if (!framing || !videoRef.current) return
+    const onFrame = () => {
+      sfx.sign()
+      startRef.current('single')
+    }
+    const stop = watchFrame(videoRef.current, { onHold: setFrameHold, onFrame })
+    return () => {
+      stop()
+      setFrameHold(0)
+    }
+  }, [framing, cam.stream])
+
+  const handsRef = useRef(null)
+  const tracking = framing && !!booth.showHandTracking
+  useEffect(() => {
+    if (!tracking || !videoRef.current || !handsRef.current) return
+    return showHands(videoRef.current, handsRef.current, { mirror: cam.settings.mirror, cover: true })
+  }, [tracking, cam.stream, cam.settings.mirror])
 
   const useFiles = async (all) => {
     const files = [...all].filter((f) => f.type.startsWith('image/'))
@@ -467,10 +557,11 @@ export default function Attract({ cam, awake, onWake, onSleep, custom, booth, up
           <div className="start-row">
             <button className="btn btn-sun big" onClick={() => onStart('single')}>{t('attract.single')}</button>
             <button className="btn btn-pink big" onClick={() => onStart('strip')}>{t('attract.strip')}</button>
+            {framing && <p className="frame-hint">{t('attract.frameHint')}</p>}
           </div>
         ) : (
           <div className="start-row">
-            <button className="btn btn-sun start-btn" onClick={onWake}>{t('attract.start')}</button>
+            <button className="btn btn-sun start-btn" data-sfx="none" onClick={() => { sfx.wake(); onWake() }}>{t('attract.start')}</button>
           </div>
         )}
       </section>
@@ -482,12 +573,20 @@ export default function Attract({ cam, awake, onWake, onSleep, custom, booth, up
         <div className="polaroid">
           <span className="tape" />
           {awake && cam.stream ? (
-            <VideoView stream={cam.stream} mirror={cam.settings.mirror} className="live" />
+            <div className="live-wrap">
+              <VideoView stream={cam.stream} mirror={cam.settings.mirror} videoRef={videoRef} className="live" />
+              {tracking && <canvas ref={handsRef} className="hand-overlay" aria-hidden="true" />}
+            </div>
           ) : (
             <div className="live sleeping">
               <img src="/assets/main.webp" alt="" />
               {awake && <span>{t('attract.waking')}</span>}
             </div>
+          )}
+          {frameHold > 0 && (
+            <span className="gesture-ring frame-ring" style={{ '--hold': frameHold }} aria-hidden="true">
+              <span>🖼️</span>
+            </span>
           )}
           <div className="polaroid-cap">{awake ? t('attract.live') : t('attract.ready')}</div>
         </div>

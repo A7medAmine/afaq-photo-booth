@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { getPin } from '../pin.js'
+import { sfx } from '../sound.js'
 
 const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'back', '0', 'clear']
 
@@ -21,10 +22,12 @@ export default function PinPad({ onCancel, onUnlock }) {
   useEffect(() => {
     if (value.length < pin.length) return
     if (value === pin) {
+      sfx.success()
       onUnlock()
       return
     }
     setWrong(true)
+    sfx.error()
     const f = fails + 1
     setFails(f)
     if (f >= 5) {

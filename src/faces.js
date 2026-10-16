@@ -35,7 +35,7 @@ const clownNose = art(160, 160, (ctx) => {
 })
 
 // Sticker parts per face: cheeks land on both cheeks, everything else once.
-export const PARTS = { cheeks: 2 }
+export const PARTS = { cheeks: 2, eye: 2 }
 
 export const FACE_STICKERS = [
   { id: 'f-tophat', anchor: 'top', src: '/assets/emoji/1f3a9.png', width: 1.3 },
@@ -61,6 +61,15 @@ export const FACE_STICKERS = [
   { id: 'f-mustache', anchor: 'mustache', src: '/assets/stickers/mustache_a.webp', width: 0.5 },
   { id: 'f-mustache-b', anchor: 'mustache', src: '/assets/stickers/mustache_b.webp', width: 0.5 },
   { id: 'f-beard', anchor: 'beard', src: '/assets/stickers/beard.webp', width: 0.95 },
+  // Hidden until the ✌️ surprise unlocks the Palestine theme, which also puts it on every face.
+  { id: 'f-flag-ps', anchor: 'cheeks', src: '/assets/palestine/flag-cheek.svg', width: 0.3, flat: true, alpha: 0.88, secret: 'palestine' },
+  { id: 'f-flag-heart', anchor: 'cheeks', src: '/assets/palestine/flag-heart.svg', width: 0.22, secret: 'palestine' },
+  { id: 'f-melon', anchor: 'cheeks', src: '/assets/palestine/melon-wedge.svg', width: 0.2, secret: 'palestine' },
+  // Hidden until the clone jutsu sign unlocks the Naruto theme, which ties the headband on every face
+  // and draws the whiskers.
+  { id: 'f-headband', anchor: 'forehead', src: '/assets/naruto/headband.svg', width: 1.3, secret: 'naruto' },
+  { id: 'f-whiskers', anchor: 'cheeks', src: '/assets/naruto/whiskers.svg', width: 0.3, flat: true, blend: 'multiply', alpha: 0.85, secret: 'naruto' },
+  { id: 'f-sharingan', anchor: 'eye', src: '/assets/naruto/sharingan.webp', width: 0.32, secret: 'naruto' },
 ]
 
 const MAX_FACES = 12
@@ -124,6 +133,8 @@ function toFace(lm, w, h, ox = 0, oy = 0) {
     mustache: mid(p(2), p(0)),
     mouth: mid(p(0), p(17)),
     cheeks: [p(50), p(280)],
+    // Each eye's centre, between its corners.
+    eyePair: [mid(p(33), p(133)), mid(p(362), p(263))],
     width: dist(p(234), p(454)),
   }
 }
@@ -197,12 +208,18 @@ export function shotToLayout(shot, slot, photo, pt) {
 export function placeOnFace(item, face, shot, slot, photo, layout, aspect = 1, part = 0) {
   const at = (pt) => shotToLayout(shot, slot, photo, pt)
   const eyes = at(face.eyes)
-  const w = (item.anchor === 'eyes' ? face.eyeSpan : face.width) * eyes.k * item.width
+  const w = (item.anchor === 'eyes' || item.anchor === 'eye' ? face.eyeSpan : face.width) * eyes.k * item.width
   const up = { x: Math.sin(face.roll), y: -Math.cos(face.roll) }
   const lift = (p, d) => ({ x: p.x + up.x * d, y: p.y + up.y * d })
   let { x, y } = eyes
   if (item.anchor === 'top') ({ x, y } = lift(at(face.forehead), w * aspect * 0.4))
   else if (item.anchor === 'cheeks') ({ x, y } = at(face.cheeks[part]))
+  else if (item.anchor === 'eye') ({ x, y } = at(face.eyePair[part]))
+  // A band across the forehead: most of the way from the eyes up to the top landmark.
+  else if (item.anchor === 'forehead') {
+    const f = at(face.forehead)
+    ;({ x, y } = { x: eyes.x + (f.x - eyes.x) * 0.72, y: eyes.y + (f.y - eyes.y) * 0.72 })
+  }
   else if (item.anchor === 'nose') ({ x, y } = at(face.nose))
   else if (item.anchor === 'mustache') ({ x, y } = at(face.mustache))
   else if (item.anchor === 'beard') {

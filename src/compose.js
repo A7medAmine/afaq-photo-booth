@@ -102,6 +102,125 @@ function heartPath(ctx, cx, cy, s) {
   ctx.fill()
 }
 
+// Art for the hidden Palestine theme (public/assets/palestine). Frames draw it only once it has
+// loaded; preloadAll() waits for it at boot so the export never misses it.
+const ps = (name) => `/assets/palestine/${name}.svg`
+const PS_FRAME_ART = ['keffiyeh-net', 'keffiyeh-band', 'tatreez', 'flag-pole', 'flag-wave', 'flag-heart', 'melon-wedge', 'melon-slice', 'olive-branch'].map(ps)
+
+// Draws an image centred on (cx, cy), w wide, keeping its aspect.
+function artAt(ctx, src, cx, cy, w, rot = 0) {
+  const img = loadImage(src)
+  if (!img) return
+  const h = (w * img.naturalHeight) / img.naturalWidth
+  ctx.save()
+  ctx.translate(cx, cy)
+  ctx.rotate(rot)
+  ctx.shadowColor = 'rgba(3,10,46,.35)'
+  ctx.shadowBlur = 12 * pixelScale(ctx)
+  ctx.shadowOffsetY = 6 * pixelScale(ctx)
+  ctx.drawImage(img, -w / 2, -h / 2, w, h)
+  ctx.restore()
+}
+
+// Repeats a tile over a rectangle at k times its own size.
+function tileRect(ctx, src, x, y, w, h, k = 1) {
+  const img = loadImage(src)
+  if (!img) return
+  ctx.save()
+  ctx.translate(x, y)
+  ctx.scale(k, k)
+  ctx.fillStyle = ctx.createPattern(img, 'repeat')
+  ctx.fillRect(0, 0, w / k, h / k)
+  ctx.restore()
+}
+
+// A thin band in the flag's colours with the red triangle at the start, used to trim panels.
+function flagBand(ctx, x, y, w, h) {
+  ;['#111111', '#ffffff', '#149954'].forEach((c, i) => {
+    ctx.fillStyle = c
+    ctx.fillRect(x, y + (h / 3) * i, w, h / 3 + 0.5)
+  })
+  ctx.fillStyle = '#e4312b'
+  ctx.beginPath()
+  ctx.moveTo(x, y)
+  ctx.lineTo(x + h * 1.2, y + h / 2)
+  ctx.lineTo(x, y + h)
+  ctx.fill()
+}
+
+// A rounded panel behind the footer so its text stays readable over a busy pattern.
+// trim(ctx, x, y, w, h) paints the band along its top edge.
+function footerPanel(ctx, layout, fill, trim = flagBand) {
+  const x = 18
+  const y = layout.footer.y + 4
+  const w = layout.W - 36
+  const h = layout.footer.h - 22
+  ctx.save()
+  roundRect(ctx, x, y, w, h, 28)
+  ctx.fillStyle = fill
+  ctx.fill()
+  ctx.clip()
+  trim(ctx, x, y, w, 18)
+  ctx.restore()
+  return { x, y, w, h }
+}
+
+// Art on the corners of the first and last photo, like stickers on a print.
+// at is 'lt', 'rt', 'lb' or 'rb'; size is a fraction of the photo width.
+function cornerArt(ctx, layout, items) {
+  const first = layout.slots[0]
+  const last = layout.slots[layout.slots.length - 1]
+  for (const { src, at, size, rot = 0 } of items) {
+    const slot = at[1] === 't' ? first : last
+    const img = loadImage(src)
+    if (!img) continue
+    // Mostly over the photo, so nothing is cut off at the edge of the print.
+    const w = slot.w * size
+    const h = (w * img.naturalHeight) / img.naturalWidth
+    const cx = at[0] === 'l' ? slot.x + w * 0.4 : slot.x + slot.w - w * 0.4
+    const cy = at[1] === 't' ? slot.y + h * 0.4 : slot.y + slot.h - h * 0.4
+    artAt(ctx, src, cx, cy, w, rot)
+  }
+}
+
+// Art for the hidden Naruto theme (public/assets/naruto), loaded like the Palestine art.
+const nr = (name) => `/assets/naruto/${name}`
+const NR_FRAME_ART = ['headband.svg', 'naruto-ramen.webp', 'naruto-confused.webp', 'sharingan.webp', 'akatsuki-cloud.webp'].map(nr)
+
+// Orange and black stripes, like the jumpsuit, to trim the footer panel.
+function jumpsuitBand(ctx, x, y, w, h) {
+  ctx.fillStyle = '#16161d'
+  ctx.fillRect(x, y, w, h)
+  ctx.fillStyle = '#ff7a1a'
+  ctx.fillRect(x, y + h / 3, w, h / 3)
+}
+
+// Manga speed lines bursting from (cx, cy).
+function speedLines(ctx, W, H, cx, cy, color, seed) {
+  const r = rng(seed)
+  const R = Math.hypot(W, H)
+  ctx.fillStyle = color
+  for (let a = 0; a < Math.PI * 2; a += 0.05 + r() * 0.07) {
+    const spread = 0.008 + r() * 0.018
+    const inner = R * (0.28 + r() * 0.12)
+    ctx.beginPath()
+    ctx.moveTo(cx + Math.cos(a) * inner, cy + Math.sin(a) * inner)
+    ctx.lineTo(cx + Math.cos(a - spread) * R, cy + Math.sin(a - spread) * R)
+    ctx.lineTo(cx + Math.cos(a + spread) * R, cy + Math.sin(a + spread) * R)
+    ctx.fill()
+  }
+}
+
+function seeds(ctx, W, H, seed) {
+  const r = rng(seed)
+  ctx.fillStyle = '#1a1a1a'
+  for (let i = 0; i < (W * H) / 9000; i++) {
+    ctx.beginPath()
+    ctx.ellipse(r() * W, r() * H, 6, 11, r() * Math.PI, 0, Math.PI * 2)
+    ctx.fill()
+  }
+}
+
 export const FRAMES = [
   {
     id: 'circuit',
@@ -421,6 +540,141 @@ export const FRAMES = [
       }
     },
   },
+  // Hidden frames, unlocked by the secret ✌️ sign on the capture screen (see Capture.jsx).
+  // footer(ctx, layout) paints behind the footer text; overlay(ctx, layout) paints over the photos.
+  {
+    id: 'palestine',
+    name: 'Keffiyeh',
+    secret: 'palestine',
+    ink: INK,
+    border: '#ffffff',
+    bg(ctx, W, H) {
+      ctx.fillStyle = '#f7f4ec'
+      ctx.fillRect(0, 0, W, H)
+      tileRect(ctx, ps('keffiyeh-net'), 0, 0, W, H, 0.6)
+    },
+    footer(ctx, layout) {
+      footerPanel(ctx, layout, '#f7f4ec')
+    },
+    overlay(ctx, layout) {
+      cornerArt(ctx, layout, [
+        { src: ps('flag-pole'), at: 'lt', size: 0.3, rot: -0.12 },
+        { src: ps('melon-wedge'), at: 'rb', size: 0.2, rot: 0.3 },
+        { src: ps('olive-branch'), at: 'lb', size: 0.22, rot: 0.1 },
+      ])
+    },
+  },
+  {
+    id: 'watermelon',
+    name: 'Watermelon',
+    secret: 'palestine',
+    ink: '#ffffff',
+    border: '#effbe0',
+    bg(ctx, W, H) {
+      const g = ctx.createLinearGradient(0, 0, 0, H)
+      g.addColorStop(0, '#ff5b6e')
+      g.addColorStop(1, '#df2038')
+      ctx.fillStyle = g
+      ctx.fillRect(0, 0, W, H)
+      seeds(ctx, W, H, 1948)
+      // Rind round the edge.
+      ctx.lineWidth = 26
+      ctx.strokeStyle = '#2f9a44'
+      ctx.strokeRect(0, 0, W, H)
+      ctx.lineWidth = 8
+      ctx.strokeStyle = '#effbe0'
+      ctx.strokeRect(17, 17, W - 34, H - 34)
+    },
+    footer(ctx, layout) {
+      footerPanel(ctx, layout, '#1f7a3a')
+    },
+    overlay(ctx, layout) {
+      cornerArt(ctx, layout, [
+        { src: ps('flag-heart'), at: 'rt', size: 0.2, rot: 0.15 },
+        { src: ps('melon-slice'), at: 'lb', size: 0.26, rot: -0.15 },
+      ])
+    },
+  },
+  {
+    id: 'tatreez',
+    name: 'Tatreez',
+    secret: 'palestine',
+    ink: INK,
+    border: '#ffffff',
+    bg(ctx, W, H) {
+      ctx.fillStyle = '#f3e9d2'
+      ctx.fillRect(0, 0, W, H)
+      tileRect(ctx, ps('tatreez'), 0, 0, W, H, 0.7)
+    },
+    footer(ctx, layout) {
+      footerPanel(ctx, layout, '#f3e9d2')
+    },
+    overlay(ctx, layout) {
+      cornerArt(ctx, layout, [
+        { src: ps('olive-branch'), at: 'lt', size: 0.26, rot: -0.2 },
+        { src: ps('flag-wave'), at: 'rb', size: 0.26, rot: -0.1 },
+      ])
+    },
+  },
+  // Unlocked by Naruto's clone jutsu sign (both hands two fingers out, crossed).
+  {
+    id: 'naruto',
+    name: 'Hokage',
+    secret: 'naruto',
+    ink: INK,
+    border: '#16161d',
+    bg(ctx, W, H) {
+      const g = ctx.createRadialGradient(W / 2, H * 0.4, 0, W / 2, H * 0.4, Math.hypot(W, H) * 0.6)
+      g.addColorStop(0, '#ffb347')
+      g.addColorStop(1, '#f2600c')
+      ctx.fillStyle = g
+      ctx.fillRect(0, 0, W, H)
+      speedLines(ctx, W, H, W / 2, H * 0.4, 'rgba(255,255,255,.28)', 1999)
+      // Black shoulders of the jumpsuit along the edges.
+      ctx.lineWidth = 22
+      ctx.strokeStyle = '#16161d'
+      ctx.strokeRect(0, 0, W, H)
+    },
+    footer(ctx, layout) {
+      footerPanel(ctx, layout, '#fff4e6', jumpsuitBand)
+    },
+    overlay(ctx, layout) {
+      cornerArt(ctx, layout, [
+        { src: nr('headband.svg'), at: 'lt', size: 0.3, rot: -0.14 },
+        { src: nr('naruto-ramen.webp'), at: 'rb', size: 0.24, rot: 0.08 },
+        { src: nr('naruto-confused.webp'), at: 'lb', size: 0.2, rot: -0.12 },
+      ])
+    },
+  },
+  {
+    id: 'akatsuki',
+    name: 'Akatsuki',
+    secret: 'naruto',
+    ink: '#ffffff',
+    border: '#c8102e',
+    bg(ctx, W, H) {
+      ctx.fillStyle = '#121216'
+      ctx.fillRect(0, 0, W, H)
+      const r = rng(1997)
+      const cloud = nr('akatsuki-cloud.webp')
+      for (let i = 0; i < (W * H) / 90000; i++) artAt(ctx, cloud, r() * W, r() * H, 90 + r() * 90, (r() - 0.5) * 0.6)
+      ctx.lineWidth = 10
+      ctx.strokeStyle = '#c8102e'
+      ctx.strokeRect(5, 5, W - 10, H - 10)
+    },
+    footer(ctx, layout) {
+      footerPanel(ctx, layout, '#1d1d24', (c, x, y, w, h) => {
+        c.fillStyle = '#c8102e'
+        c.fillRect(x, y, w, h)
+      })
+    },
+    overlay(ctx, layout) {
+      cornerArt(ctx, layout, [
+        { src: nr('sharingan.webp'), at: 'rt', size: 0.2, rot: 0.2 },
+        { src: nr('akatsuki-cloud.webp'), at: 'lb', size: 0.28, rot: -0.1 },
+      ])
+    },
+  },
 ]
 
 const club = (o) => ({ kind: 'img', group: 'club', ...o })
@@ -450,6 +704,14 @@ export const STICKERS = [
     codes.map((c) => ({ id: `e-${c}`, kind: 'img', group, src: `/assets/emoji/${c}.png`, size: 0.2 })),
   ),
   ...PACK,
+  // Hidden until the ✌️ surprise unlocks the Palestine theme.
+  ...[['flag-pole', 0.3], ['flag-wave', 0.32], ['flag-heart', 0.24], ['melon-wedge', 0.24], ['melon-slice', 0.28], ['olive-branch', 0.3], ['key', 0.3]].map(
+    ([n, size]) => ({ id: `ps-${n}`, kind: 'img', group: 'palestine', secret: 'palestine', src: ps(n), size }),
+  ),
+  // Hidden until the clone jutsu sign unlocks the Naruto theme.
+  ...[['naruto-ramen.webp', 0.3], ['naruto-confused.webp', 0.3], ['sharingan.webp', 0.22], ['akatsuki-cloud.webp', 0.28], ['headband.svg', 0.36]].map(
+    ([n, size]) => ({ id: `nr-${n.split('.')[0]}`, kind: 'img', group: 'naruto', secret: 'naruto', src: nr(n), size }),
+  ),
 ]
 
 export const BUBBLE_COLORS = ['#ffd23f', '#2ee6a6', '#ff5fa2', '#3ca2fa', '#ffffff', '#ffd23f', '#ff5fa2']
@@ -484,7 +746,7 @@ export function whenLoaded(src) {
 }
 
 export function preloadAll() {
-  const srcs = [...STICKERS.filter((s) => s.kind === 'img').map((s) => s.src), '/assets/main.webp']
+  const srcs = [...STICKERS.filter((s) => s.kind === 'img').map((s) => s.src), ...PS_FRAME_ART, ...NR_FRAME_ART, '/assets/main.webp']
   return Promise.all(srcs.map((s) => { loadImage(s); return imageCache.get(s) }))
 }
 
@@ -854,7 +1116,11 @@ function drawBase(ctx, layout, state, withFooter) {
     ctx.restore()
   })
 
-  if (withFooter) drawFooter(ctx, layout, frame, state.caption, state.lang)
+  frame.overlay?.(ctx, layout)
+  if (withFooter) {
+    frame.footer?.(ctx, layout)
+    drawFooter(ctx, layout, frame, state.caption, state.lang)
+  }
 }
 
 // The frame, photos (with their CSS filter) and footer are the expensive part and only change on

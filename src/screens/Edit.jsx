@@ -23,9 +23,13 @@ import { groupOf } from '../customStickers.js'
 import { detectFaces, FACE_STICKERS, PARTS, placeOnFace, shotToLayout, whenIdle } from '../faces.js'
 import { OPEN_SHAPES, SHAPES } from '../shapes.js'
 import { BUBBLE_TEXT, useI18n } from '../i18n.jsx'
+import { sfx } from '../sound.js'
 
 const TABS = [['Frames', 'edit.frames'], ['Filters', 'edit.filters'], ['Stickers', 'edit.stickers'], ['Face', 'edit.face'], ['Draw', 'edit.draw'], ['Text', 'edit.text'], ['Photo', 'edit.photo']]
-const DEFAULT_GROUP_NAMES = { mine: 'Mine', club: 'Club', faces: 'Faces', fun: 'Fun', tech: 'Tech', cats: 'Cats', memes: 'Memes', music: 'Music', cute: 'Cute', arabic: 'Arabic', objects: 'Objects' }
+// Face art each hidden theme puts on every face when it is unlocked.
+const THEME_FACES = { palestine: ['f-flag-ps'], naruto: ['f-headband', 'f-whiskers'] }
+const FEATURED_GROUPS = ['memes', 'cats', 'cute', 'tech', 'arabic']
+const DEFAULT_GROUP_NAMES ={ mine: 'Mine', club: 'Club', faces: 'Faces', fun: 'Fun', tech: 'Tech', cats: 'Cats', memes: 'Memes', music: 'Music', cute: 'Cute', arabic: 'Arabic', objects: 'Objects', palestine: 'Palestine', naruto: 'Naruto' }
 const INK_COLORS = ['#030a2e', '#ffffff', '#ff5fa2', '#ffd23f', '#2ee6a6', '#3ca2fa', '#2460e7', '#ff8a3d']
 const INK_SIZES = [8, 18, 36]
 const TEXT_COLORS = ['#ffd23f', '#ff5fa2', '#2ee6a6', '#3ca2fa', '#ffffff', '#ff8a3d']
@@ -57,7 +61,7 @@ export default function Edit({ custom = [], faceCustom = [], hidden = [], groups
   const [busy, setBusy] = useState(false)
   const [drawing, setDrawing] = useState(false)
   const [cropping, setCropping] = useState(false)
-  const [group, setGroup] = useState('all')
+  const [group, setGroup] = useState(edit.theme || 'all')
   const [customText, setCustomText] = useState('')
   const [textColor, setTextColor] = useState(TEXT_COLORS[0])
   const [inkColor, setInkColor] = useState(INK_COLORS[2])
@@ -159,7 +163,13 @@ export default function Edit({ custom = [], faceCustom = [], hidden = [], groups
     return () => { live = false }
   }, [L, shots])
 
-  const faceItems = useMemo(() => [...FACE_STICKERS.filter((s) => !hidden.includes(s.id)), ...faceCustom], [hidden, faceCustom])
+  // Secret frames and face stickers only show once their theme is unlocked; the theme's own come first.
+  const unlocked = (item) => !item.secret || item.secret === edit.theme
+  const frames = useMemo(() => [...FRAMES.filter((f) => f.secret && unlocked(f)), ...FRAMES.filter((f) => !f.secret)], [edit.theme]) // eslint-disable-line react-hooks/exhaustive-deps
+  const faceItems = useMemo(
+    () => [...FACE_STICKERS.filter((s) => !hidden.includes(s.id) && unlocked(s)), ...faceCustom],
+    [hidden, faceCustom, edit.theme], // eslint-disable-line react-hooks/exhaustive-deps
+  )
   const placeFace = (item, shot, idx, photo, part = 0) => {
     const img = loadImage(item.src)
     return placeOnFace(item, faces[shot][idx], shots[shot], L.slots[shot], photo, L, img ? img.naturalHeight / img.naturalWidth : 1, part)
@@ -186,6 +196,40 @@ export default function Edit({ custom = [], faceCustom = [], hidden = [], groups
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [edit.photo, faces, setEdit])
 
+  // An unlocked theme puts its face art on every face, once; guests can still take it off.
+  // Palestine paints a flag on both cheeks; Naruto ties the headband on and draws the whiskers.
+  useEffect(() => {
+    const ids = THEME_FACES[edit.theme]
+    if (!faces || !ids || edit.themeFaces) return
+    const items = ids.map((id) => FACE_STICKERS.find((i) => i.id === id))
+    const anchors = items.map((i) => i.anchor)
+    const photo = edit.photo || DEFAULT_PHOTO
+    const art = items.flatMap((item) =>
+      faces.flatMap((list, shot) =>
+        list.flatMap((_, idx) =>
+          Array.from({ length: PARTS[item.anchor] || 1 }, (_, part) => ({
+            kind: 'img',
+            src: item.src,
+            flat: item.flat,
+            blend: item.blend,
+            alpha: item.alpha,
+            id: uid(),
+            rot: 0,
+            face: { shot, idx, item: item.id, part },
+            ...placeFace(item, shot, idx, photo, part),
+          })),
+        ),
+      ),
+    )
+    setEdit((e) => ({
+      ...e,
+      themeFaces: true,
+      // Any other sticker on the same spot of those faces would sit under the theme's art.
+      stickers: [...e.stickers.filter((s) => !(s.face && anchors.includes(faceItems.find((i) => i.id === s.face.item)?.anchor))), ...art],
+    }))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [faces, edit.theme, edit.themeFaces])
+
   const patchEdit = (p) => setEdit((e) => ({ ...e, ...p }))
   const patchSticker = (id, fn) =>
     setEdit((e) => ({ ...e, stickers: e.stickers.map((s) => (s.id === id ? { ...s, ...fn(s), face: undefined } : s)) }))
@@ -200,6 +244,7 @@ export default function Edit({ custom = [], faceCustom = [], hidden = [], groups
     }
     setEdit((e) => ({ ...e, stickers: [...e.stickers, s] }))
     setSelectedId(s.id)
+    sfx.pop()
   }
 
   const toLayoutXY = (ev) => {
@@ -345,16 +390,21 @@ export default function Edit({ custom = [], faceCustom = [], hidden = [], groups
     drag.current = null
   }
 
-  const visible = STICKERS.filter((s) => !hidden.includes(s.id))
+  const visible = STICKERS.filter((s) => !hidden.includes(s.id) && unlocked(s))
   const mine = [...(edit.doodles || []), ...custom]
   const inGroup = (s, id) => groupOf(s, assign) === id
-  const groups = allGroups.filter((g) => [...mine, ...visible].some((s) => inGroup(s, g.id)))
+  // Featured groups lead both the tab row and the "All" grid; stable sort keeps the rest in their saved order.
+  const rank = (id) => { const i = FEATURED_GROUPS.indexOf(id); return i < 0 ? FEATURED_GROUPS.length : i }
+  const groups = allGroups.filter((g) => [...mine, ...visible].some((s) => inGroup(s, g.id))).sort((a, b) => rank(a.id) - rank(b.id))
   const active = groups.some((g) => g.id === group) ? group : 'all'
-  const shown = active === 'all' ? [...mine, ...visible] : [...mine, ...visible].filter((s) => inGroup(s, active))
+  const shown = active === 'all'
+    ? [...mine, ...visible].sort((a, b) => rank(groupOf(a, assign)) - rank(groupOf(b, assign)))
+    : [...mine, ...visible].filter((s) => inGroup(s, active))
 
   const selected = edit.stickers.find((s) => s.id === selectedId)
   const tweak = (fn) => selected && patchSticker(selected.id, fn)
   const remove = () => {
+    sfx.whoosh()
     setEdit((e) => ({ ...e, stickers: e.stickers.filter((s) => s.id !== selectedId) }))
     setSelectedId(null)
   }
@@ -402,6 +452,7 @@ export default function Edit({ custom = [], faceCustom = [], hidden = [], groups
     const photo = edit.photo || DEFAULT_PHOTO
     const parts = PARTS[item.anchor] || 1
     const added = onFace(item) === targets.length * parts
+    added ? sfx.whoosh() : sfx.pop()
     const fresh = added
       ? []
       : targets.flatMap(({ shot, idx }) =>
@@ -423,7 +474,10 @@ export default function Edit({ custom = [], faceCustom = [], hidden = [], groups
     }))
     setSelectedId(null)
   }
-  const clearFaces = () => setEdit((e) => ({ ...e, stickers: e.stickers.filter((s) => !inTarget(s)) }))
+  const clearFaces = () => {
+    sfx.whoosh()
+    setEdit((e) => ({ ...e, stickers: e.stickers.filter((s) => !inTarget(s)) }))
+  }
 
   // Numbered badges sit under each face on the photo so one person can be picked by tapping.
   const badges = []
@@ -494,7 +548,7 @@ export default function Edit({ custom = [], faceCustom = [], hidden = [], groups
           <button className="tool" aria-label={t('edit.turnLeft')} onClick={() => tweak((s) => ({ rot: s.rot - 0.2 }))}>↺</button>
           <button className="tool" aria-label={t('edit.turnRight')} onClick={() => tweak((s) => ({ rot: s.rot + 0.2 }))}>↻</button>
           <button className="tool wide" onClick={toFront}>{t('edit.front')}</button>
-          <button className="tool danger wide" onClick={remove}>{t('edit.remove')}</button>
+          <button className="tool danger wide" data-sfx="none" onClick={remove}>{t('edit.remove')}</button>
         </div>
       </section>
 
@@ -513,7 +567,7 @@ export default function Edit({ custom = [], faceCustom = [], hidden = [], groups
         <div className="panel-body">
           {tab === 'Frames' && (
             <div className="grid minis">
-              {FRAMES.map((f) => (
+              {frames.map((f) => (
                 <button key={f.id} className={`opt ${edit.frameId === f.id ? 'on' : ''}`} onClick={() => patchEdit({ frameId: f.id })}>
                   <Mini layout={layout} shots={miniShots} caption={edit.caption} lang={lang} filterId={edit.filterId} frameId={f.id} />
                   <span>{t(`frame.${f.id}`)}</span>
@@ -547,7 +601,7 @@ export default function Edit({ custom = [], faceCustom = [], hidden = [], groups
                 ))}
               </div>
               {shown.map((s) => (
-                <button key={s.id} className="opt sticker" {...dragProps(s)} aria-label={`${t('edit.addSticker')} ${s.id}`} onClick={() => addSticker(s)}>
+                <button key={s.id} className="opt sticker" data-sfx="none" {...dragProps(s)} aria-label={`${t('edit.addSticker')} ${s.id}`} onClick={() => addSticker(s)}>
                   {s.kind === 'img' ? <img src={s.src} alt="" /> : <span className="emoji">{s.value}</span>}
                 </button>
               ))}
@@ -568,7 +622,7 @@ export default function Edit({ custom = [], faceCustom = [], hidden = [], groups
               )}
               <div className="grid stickers">
                 {faceItems.map((item) => (
-                  <button key={item.id} className={`opt sticker ${targets.length && onFace(item) === targets.length * (PARTS[item.anchor] || 1) ? 'on' : ''}`} disabled={!targets.length} onClick={() => toggleFace(item)}>
+                  <button key={item.id} data-sfx="none" className={`opt sticker ${targets.length && onFace(item) === targets.length * (PARTS[item.anchor] || 1) ? 'on' : ''}`} disabled={!targets.length} onClick={() => toggleFace(item)}>
                     <img src={item.src} alt="" />
                   </button>
                 ))}
@@ -576,7 +630,7 @@ export default function Edit({ custom = [], faceCustom = [], hidden = [], groups
               {faceCount > 1 && (
                 <button className="btn btn-ghost" aria-pressed={!showNums} onClick={() => setShowNums((v) => !v)}>{showNums ? t('face.hideNums') : t('face.showNums')}</button>
               )}
-              <button className="btn btn-ghost" disabled={!edit.stickers.some(inTarget)} onClick={clearFaces}>{t('face.clear')}</button>
+              <button className="btn btn-ghost" data-sfx="none" disabled={!edit.stickers.some(inTarget)} onClick={clearFaces}>{t('face.clear')}</button>
             </div>
           )}
 
@@ -676,6 +730,7 @@ export default function Edit({ custom = [], faceCustom = [], hidden = [], groups
                     key={b.text}
                     {...dragProps({ kind: 'text', text: b.text, color: b.color, size: 0.3 })}
                     className="bubble"
+                    data-sfx="none"
                     style={{ background: b.color }}
                     onClick={() => addSticker({ kind: 'text', text: b.text, color: b.color, size: 0.3 })}
                   >

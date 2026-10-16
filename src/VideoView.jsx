@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 
-export default function VideoView({ stream, mirror, videoRef, className }) {
+export default function VideoView({ stream, mirror, zoom = 1, videoRef, className }) {
   const local = useRef(null)
   const ref = videoRef || local
   useEffect(() => {
@@ -17,7 +17,7 @@ export default function VideoView({ stream, mirror, videoRef, className }) {
       autoPlay
       playsInline
       muted
-      style={{ transform: mirror ? 'scaleX(-1)' : undefined }}
+      style={{ transform: mirror || zoom !== 1 ? `scale(${mirror ? -zoom : zoom}, ${zoom})` : undefined }}
     />
   )
 }

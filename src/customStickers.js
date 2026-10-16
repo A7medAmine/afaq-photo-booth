@@ -56,6 +56,8 @@ export const DEFAULT_GROUPS = [
   { id: 'cute', name: 'Cute' },
   { id: 'arabic', name: 'Arabic' },
   { id: 'objects', name: 'Objects' },
+  { id: 'palestine', name: 'Palestine' },
+  { id: 'naruto', name: 'Naruto' },
 ]
 
 export const groupOf = (s, assign) => assign[s.id] ?? s.group ?? 'mine'
