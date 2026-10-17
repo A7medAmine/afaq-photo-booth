@@ -50,6 +50,7 @@ self.onmessage = async ({ data }) => {
     result = {
       landmarks: res.landmarks,
       gestures: res.gestures.map((hand) => hand.map((g) => ({ categoryName: g.categoryName, score: g.score }))),
+      handedness: res.handedness.map((hand) => hand[0]?.categoryName ?? null),
     }
   } catch { /* reported as no result */ }
   bitmap.close()

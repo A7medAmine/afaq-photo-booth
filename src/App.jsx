@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { useCamera } from './camera.js'
 import { fontsReady, preloadAll } from './compose.js'
 import { warmUpFaces } from './faces.js'
@@ -8,6 +8,7 @@ import { useIdle } from './useIdle.js'
 import { useBoothSettings } from './boothSettings.js'
 import { useI18n } from './i18n.jsx'
 import { setSoundOn, sfx } from './sound.js'
+import { count } from './stats.js'
 import Attract from './screens/Attract.jsx'
 import Capture from './screens/Capture.jsx'
 const Edit = lazy(() => import('./screens/Edit.jsx'))
@@ -15,7 +16,7 @@ import Done from './screens/Done.jsx'
 
 const IDLE_WARN = 20
 
-const freshEdit = () => ({ frameId: 'circuit', filterId: 'none', caption: '', stickers: [], doodles: [], ink: [], colors: [], photo: { zoom: 1, ox: 0, oy: 0 } })
+const freshEdit = () => ({ frameId: 'circuit', filterId: 'none', caption: '', stickers: [], doodles: [], ink: [], colors: [], photo: { zoom: 1, ox: 0, oy: 0 }, warp: {}, clones: 0 })
 
 export default function App() {
   const [screen, setScreen] = useState('attract')
@@ -31,6 +32,9 @@ export default function App() {
   const [edit, setEdit] = useState(freshEdit)
   const [final, setFinal] = useState(null)
   const [share, setShare] = useState(null)
+  // Read when the guest leaves, to count the photos guests let the club keep.
+  const shareRef = useRef(null)
+  shareRef.current = share
   const [used, setUsed] = useState({ edits: 0, extends: 0 })
   const { booth, updateBooth } = useBoothSettings()
 
@@ -65,6 +69,7 @@ export default function App() {
   }, [])
 
   const reset = useCallback(() => {
+    if (shareRef.current?.keep) count('kept')
     setScreen('attract')
     setAwake(false)
     setShots([])
@@ -90,10 +95,14 @@ export default function App() {
         countdown={booth.countdownSeconds}
         gestureWait={booth.gestureShutter ? booth.gestureWaitSeconds : 0}
         gestureZoom={!!booth.gestureZoom}
+        posePrompts={!!booth.posePrompts}
         showHands={!!booth.showHandTracking && !!(booth.gestureShutter || booth.gestureZoom)}
         onCancel={reset}
         onDone={(s, theme) => {
           setShots(s)
+          count('shots', s.length)
+          // Head sizes belong to the faces of the old shots.
+          setEdit((e) => ({ ...e, warp: {} }))
           // A secret sign (✌️ or the clone jutsu) unlocks a theme: its frame is picked and its face art goes on (see Edit.jsx).
           if (theme) setEdit((e) => ({ ...e, theme, frameId: theme, themeFaces: false }))
           setScreen('edit')

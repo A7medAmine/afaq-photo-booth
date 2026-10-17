@@ -853,6 +853,26 @@ function drawSticker(ctx, s, W, H) {
   ctx.restore()
 }
 
+// Stickers on shadow clones (marked behind) go under the guests' cut-out (state.fronts, see
+// effects.js), which is drawn just like the photo; every other sticker goes on top.
+function drawStickers(ctx, layout, state) {
+  const { W, H } = layout
+  const back = state.stickers.filter((s) => s.behind)
+  if (!back.length || !state.fronts?.some(Boolean)) return state.stickers.forEach((s) => drawSticker(ctx, s, W, H))
+  back.forEach((s) => drawSticker(ctx, s, W, H))
+  const filter = (FILTERS.find((f) => f.id === state.filterId) || FILTERS[0]).css
+  layout.slots.forEach((slot, i) => {
+    const front = state.fronts[i]
+    if (!front) return
+    ctx.save()
+    roundRect(ctx, slot.x, slot.y, slot.w, slot.h, 20)
+    ctx.clip()
+    drawCover(ctx, front, slot, filter, state.photo)
+    ctx.restore()
+  })
+  state.stickers.filter((s) => !s.behind).forEach((s) => drawSticker(ctx, s, W, H))
+}
+
 function paintInk(ctx, ink) {
   ctx.save()
   ctx.lineCap = 'round'
@@ -1189,7 +1209,7 @@ export function renderComposite(canvas, state, opts = {}) {
     ctx.drawImage(layer.base.canvas, 0, 0)
     ctx.restore()
     if (withStickers) {
-      state.stickers.forEach((s) => drawSticker(ctx, s, W, H))
+      drawStickers(ctx, layout, state)
       if (state.ink && state.ink.length) drawInkCached(ctx, layer, state.ink, scale, W, H)
       const sel = state.stickers.find((s) => s.id === selectedId)
       if (sel) drawSelection(ctx, sel, W, H, handleR)
@@ -1200,7 +1220,7 @@ export function renderComposite(canvas, state, opts = {}) {
   drawBase(ctx, layout, state, withFooter)
 
   if (withStickers) {
-    state.stickers.forEach((s) => drawSticker(ctx, s, W, H))
+    drawStickers(ctx, layout, state)
     if (state.ink && state.ink.length) drawInk(ctx, state.ink)
     const sel = state.stickers.find((s) => s.id === selectedId)
     if (sel) drawSelection(ctx, sel, W, H, handleR)

@@ -21,6 +21,8 @@ export const SESSION_DEFAULTS = {
   frameStart: 1,
   // 1 plays sound effects (button taps, countdown, shutter, chimes).
   sound: 1,
+  // 1 shows a pose challenge ("superhero pose", "group hug"...) before each shot.
+  posePrompts: 1,
 }
 
 export const SESSION_LIMITS = {
@@ -36,6 +38,7 @@ export const SESSION_LIMITS = {
   showHandTracking: [0, 1],
   frameStart: [0, 1],
   sound: [0, 1],
+  posePrompts: [0, 1],
 }
 
 function load() {

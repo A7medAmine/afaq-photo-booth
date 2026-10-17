@@ -4,7 +4,8 @@ import { grabStill } from '../camera.js'
 import { LAYOUTS } from '../compose.js'
 import { sfx } from '../sound.js'
 import { CLONE_SIGN, SHUTTER_GESTURES, showHands as drawHands, watchGestures, watchZoom } from '../gestures.js'
-import { useI18n } from '../i18n.jsx'
+import { POSE_PROMPTS, useI18n } from '../i18n.jsx'
+import { count as countStat, countTheme } from '../stats.js'
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms))
 const THUMB_W = 240
@@ -56,9 +57,13 @@ function thumbUrl(shot) {
 // onDone(shots, theme) gets the theme of the last secret sign shown ('palestine' or 'naruto'), else null.
 // gestureZoom lets guests pinch with one hand to zoom the shot.
 // showHands draws the tracked hand joints over the picture for the whole capture.
-export default function Capture({ cam, layout, countdown = 3, gestureWait = 0, gestureZoom = false, showHands = false, onDone, onCancel }) {
+// posePrompts shows a pose challenge for each shot.
+export default function Capture({ cam, layout, countdown = 3, gestureWait = 0, gestureZoom = false, showHands = false, posePrompts = false, onDone, onCancel }) {
   const L = LAYOUTS[layout]
-  const { t } = useI18n()
+  const { t, lang } = useI18n()
+  // One challenge per shot, drawn without repeats; kept as indexes so a language switch follows.
+  const poseOrder = useRef(null)
+  poseOrder.current ||= [...POSE_PROMPTS.en.keys()].sort(() => Math.random() - 0.5)
   const videoRef = useRef(null)
   const handsRef = useRef(null)
   const [count, setCount] = useState(null)
@@ -136,6 +141,7 @@ export default function Capture({ cam, layout, countdown = 3, gestureWait = 0, g
             const secret = SECRETS[name]
             if (secret && themeRef.current !== secret.theme) {
               themeRef.current = secret.theme
+              countTheme(secret.theme)
               setSurprise(secret)
               sfx.secret()
               setTimeout(() => !dead && setSurprise((s) => (s === secret ? null : s)), 2600)
@@ -225,6 +231,7 @@ export default function Capture({ cam, layout, countdown = 3, gestureWait = 0, g
           shots.pop()
           setThumbs((t) => Object.assign([...t], { [at]: undefined }))
           sfx.retake()
+          countStat('retakes')
           i--
         } else if (verdict) sfx.keep()
       }
@@ -267,6 +274,12 @@ export default function Capture({ cam, layout, countdown = 3, gestureWait = 0, g
             <div key={count} className="digit" aria-live="assertive">{count}</div>
           )}
           {count === 0 && !developing && <div className="cap-msg smile">{t('cap.smile')}</div>}
+          {posePrompts && !review && !developing && count !== 0 && (
+            <div key={index} className="pose-card" aria-live="polite">
+              <small>{t('pose.title')}</small>
+              <span>{POSE_PROMPTS[lang][poseOrder.current[index % poseOrder.current.length]]}</span>
+            </div>
+          )}
           {surprise && (
             <div key={surprise.theme} className="cap-msg surprise" aria-live="polite">
               <span className="surprise-art">{surprise.art.map((src) => <img key={src} src={src} alt="" />)}</span>

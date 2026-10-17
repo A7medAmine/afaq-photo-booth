@@ -21,6 +21,8 @@ import ToolIcon from './ToolIcon.jsx'
 import BrushSize from './BrushSize.jsx'
 import { groupOf } from '../customStickers.js'
 import { detectFaces, FACE_STICKERS, PARTS, placeOnFace, shotToLayout, whenIdle } from '../faces.js'
+import { applyEffects, CLONE_COUNTS, HEAD_SIZES, scaleFaces } from '../effects.js'
+import { countPhoto } from '../stats.js'
 import { OPEN_SHAPES, SHAPES } from '../shapes.js'
 import { BUBBLE_TEXT, useI18n } from '../i18n.jsx'
 import { sfx } from '../sound.js'
@@ -69,7 +71,8 @@ export default function Edit({ custom = [], faceCustom = [], hidden = [], groups
   const [drawTool, setDrawTool] = useState('pen')
   const [shape, setShape] = useState('circle')
   const [filled, setFilled] = useState(true)
-  const [faces, setFaces] = useState(null)
+  // Faces as detected on the photo, before any head warp or clones.
+  const [rawFaces, setRawFaces] = useState(null)
   const [who, setWho] = useState([])
   const [showNums, setShowNums] = useState(true)
   const canvasRef = useRef(null)
@@ -80,11 +83,17 @@ export default function Edit({ custom = [], faceCustom = [], hidden = [], groups
   const pinch = useRef(null)
   const [view, setView] = useState({ z: 1, x: 0, y: 0 })
   const [hand, setHand] = useState(false)
-  const shots = useMemo(() => fullShots.map((s) => scaledCopy(s, WORK_SIDE)), [fullShots])
+  const baseShots = useMemo(() => fullShots.map((s) => scaledCopy(s, WORK_SIDE)), [fullShots])
+  // Shots and faces after the head warps and clones (see effects.js); the plain ones until those are done.
+  const [fx, setFx] = useState(null)
+  const [fxBusy, setFxBusy] = useState(false)
+  const shots = fx?.shots || baseShots
+  const faces = fx?.faces || null
   const L = useMemo(() => getLayout(layout, shots), [layout, shots])
   const miniShots = useMemo(() => shots.map((s) => scaledCopy(s, PREVIEW_SIDE)), [shots])
 
-  const state = useMemo(() => ({ layout, shots, lang, ...edit }), [layout, shots, lang, edit])
+  const fronts = fx?.fronts
+  const state = useMemo(() => ({ layout, shots, fronts, lang, ...edit }), [layout, shots, fronts, lang, edit])
 
   const [tick, setTick] = useState(0)
   const viewRef = useRef(view)
@@ -157,11 +166,26 @@ export default function Edit({ custom = [], faceCustom = [], hidden = [], groups
   useEffect(() => {
     let live = true
     whenIdle()
-      .then(() => live && Promise.all(L.slots.map((_, i) => detectFaces(shots[i]))))
-      .then((f) => live && (setFaces(f), setWho([])))
-      .catch(() => live && setFaces([]))
+      .then(() => live && Promise.all(baseShots.map((s) => detectFaces(s))))
+      .then((f) => live && (setRawFaces(f), setWho([])))
+      .catch(() => live && setRawFaces(baseShots.map(() => [])))
     return () => { live = false }
-  }, [L, shots])
+  }, [baseShots])
+
+  // Head sizes are kept per face as "shot:index"; clones count for every shot.
+  const fxOptions = (i) => ({ warp: (rawFaces?.[i] || []).map((_, idx) => edit.warp?.[`${i}:${idx}`]), clones: edit.theme === 'naruto' ? edit.clones || 0 : 0 })
+  const fxKey = JSON.stringify(baseShots.map((_, i) => fxOptions(i)))
+  useEffect(() => {
+    if (!rawFaces) return
+    let live = true
+    setFxBusy(true)
+    Promise.all(baseShots.map((s, i) => applyEffects(s, rawFaces[i], fxOptions(i))))
+      .then((r) => live && setFx({ shots: r.map((x) => x.shot), faces: r.map((x) => x.faces), fronts: r.map((x) => x.front) }))
+      .catch(() => live && setFx({ shots: baseShots, faces: rawFaces }))
+      .finally(() => live && setFxBusy(false))
+    return () => { live = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rawFaces, baseShots, fxKey])
 
   // Secret frames and face stickers only show once their theme is unlocked; the theme's own come first.
   const unlocked = (item) => !item.secret || item.secret === edit.theme
@@ -186,49 +210,65 @@ export default function Edit({ custom = [], faceCustom = [], hidden = [], groups
       if (!e.stickers.some((s) => s.face)) return e
       return {
         ...e,
-        stickers: e.stickers.map((s) => {
+        stickers: e.stickers.flatMap((s) => {
           const f = s.face
-          const item = f && latest.current.faceItems.find((i) => i.id === f.item)
-          return item && faces[f.shot]?.[f.idx] ? { ...s, ...latest.current.placeFace(item, f.shot, f.idx, photo, f.part) } : s
+          if (!f) return [s]
+          // A clone's stickers go when the clones do.
+          if (!faces[f.shot]?.[f.idx]) return []
+          const item = latest.current.faceItems.find((i) => i.id === f.item)
+          return [item ? { ...s, ...latest.current.placeFace(item, f.shot, f.idx, photo, f.part) } : s]
         }),
       }
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [edit.photo, faces, setEdit])
 
+  // Stickers for one face item on the given faces, one per part (both cheeks get one).
+  const faceArt = (item, list) => {
+    const photo = edit.photo || DEFAULT_PHOTO
+    return list.flatMap(({ shot, idx }) =>
+      Array.from({ length: PARTS[item.anchor] || 1 }, (_, part) => ({
+        kind: 'img',
+        src: item.src,
+        flat: item.flat,
+        blend: item.blend,
+        alpha: item.alpha,
+        id: uid(),
+        rot: 0,
+        behind: !!faces[shot][idx].clone,
+        face: { shot, idx, item: item.id, part },
+        ...placeFace(item, shot, idx, photo, part),
+      })),
+    )
+  }
+
   // An unlocked theme puts its face art on every face, once; guests can still take it off.
   // Palestine paints a flag on both cheeks; Naruto ties the headband on and draws the whiskers.
+  // Shadow clones made later get the same art as soon as they appear.
   useEffect(() => {
     const ids = THEME_FACES[edit.theme]
-    if (!faces || !ids || edit.themeFaces) return
+    if (!faces || !ids) return
     const items = ids.map((id) => FACE_STICKERS.find((i) => i.id === id))
-    const anchors = items.map((i) => i.anchor)
-    const photo = edit.photo || DEFAULT_PHOTO
-    const art = items.flatMap((item) =>
-      faces.flatMap((list, shot) =>
-        list.flatMap((_, idx) =>
-          Array.from({ length: PARTS[item.anchor] || 1 }, (_, part) => ({
-            kind: 'img',
-            src: item.src,
-            flat: item.flat,
-            blend: item.blend,
-            alpha: item.alpha,
-            id: uid(),
-            rot: 0,
-            face: { shot, idx, item: item.id, part },
-            ...placeFace(item, shot, idx, photo, part),
-          })),
-        ),
-      ),
-    )
-    setEdit((e) => ({
-      ...e,
-      themeFaces: true,
-      // Any other sticker on the same spot of those faces would sit under the theme's art.
-      stickers: [...e.stickers.filter((s) => !(s.face && anchors.includes(faceItems.find((i) => i.id === s.face.item)?.anchor))), ...art],
-    }))
+    const all = faces.flatMap((list, shot) => list.map((f, idx) => ({ shot, idx, clone: f.clone })))
+    if (!edit.themeFaces) {
+      const anchors = items.map((i) => i.anchor)
+      setEdit((e) => ({
+        ...e,
+        themeFaces: true,
+        // Any other sticker on the same spot of those faces would sit under the theme's art.
+        stickers: [...e.stickers.filter((s) => !(s.face && anchors.includes(faceItems.find((i) => i.id === s.face.item)?.anchor))), ...items.flatMap((item) => faceArt(item, all))],
+      }))
+      return
+    }
+    const bare = all.filter((f) => f.clone && !edit.stickers.some((s) => s.face && s.face.shot === f.shot && s.face.idx === f.idx))
+    if (bare.length) setEdit((e) => ({ ...e, stickers: [...e.stickers, ...items.flatMap((item) => faceArt(item, bare))] }))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [faces, edit.theme, edit.themeFaces])
+
+  // Someone picked in the Face tab who is gone (a clone, once the clones are off) is unpicked.
+  useEffect(() => {
+    if (faces) setWho((w) => w.filter((k) => { const [shot, idx] = k.split(':').map(Number); return !!faces[shot]?.[idx] }))
+  }, [faces])
 
   const patchEdit = (p) => setEdit((e) => ({ ...e, ...p }))
   const patchSticker = (id, fn) =>
@@ -449,25 +489,10 @@ export default function Edit({ custom = [], faceCustom = [], hidden = [], groups
   const inTarget = (s) => s.face && (!who.length || who.includes(faceKey(s.face.shot, s.face.idx)))
   const onFace = (item) => edit.stickers.filter((s) => inTarget(s) && s.face.item === item.id).length
   const toggleFace = (item) => {
-    const photo = edit.photo || DEFAULT_PHOTO
     const parts = PARTS[item.anchor] || 1
     const added = onFace(item) === targets.length * parts
     added ? sfx.whoosh() : sfx.pop()
-    const fresh = added
-      ? []
-      : targets.flatMap(({ shot, idx }) =>
-          Array.from({ length: parts }, (_, part) => ({
-            kind: 'img',
-            src: item.src,
-            flat: item.flat,
-            blend: item.blend,
-            alpha: item.alpha,
-            id: uid(),
-            rot: 0,
-            face: { shot, idx, item: item.id, part },
-            ...placeFace(item, shot, idx, photo, part),
-          })),
-        )
+    const fresh = added ? [] : faceArt(item, targets)
     setEdit((e) => ({
       ...e,
       stickers: [...e.stickers.filter((s) => !(inTarget(s) && (added ? s.face.item === item.id : faceItems.find((i) => i.id === s.face.item)?.anchor === item.anchor))), ...fresh],
@@ -477,6 +502,23 @@ export default function Edit({ custom = [], faceCustom = [], hidden = [], groups
   const clearFaces = () => {
     sfx.whoosh()
     setEdit((e) => ({ ...e, stickers: e.stickers.filter((s) => !inTarget(s)) }))
+  }
+
+  // Head size goes to the chosen people too. Clones copy their guest's head, so they are left out.
+  const realTargets = targets.filter((f) => !faces[f.shot][f.idx].clone)
+  const headOf = (f) => edit.warp?.[f.key] || 'normal'
+  const headOn = (mode) => realTargets.length > 0 && realTargets.every((f) => headOf(f) === mode)
+  const setHead = (mode) => {
+    mode === 'normal' ? sfx.whoosh() : sfx.pop()
+    setEdit((e) => {
+      const warp = { ...e.warp }
+      realTargets.forEach((f) => (mode === 'normal' ? delete warp[f.key] : (warp[f.key] = mode)))
+      return { ...e, warp }
+    })
+  }
+  const setClones = (n) => {
+    n ? sfx.secret() : sfx.whoosh()
+    patchEdit({ clones: n })
   }
 
   // Numbered badges sit under each face on the photo so one person can be picked by tapping.
@@ -503,7 +545,12 @@ export default function Edit({ custom = [], faceCustom = [], hidden = [], groups
   const finish = async () => {
     setBusy(true)
     setSelectedId(null)
-    onFinish(await renderFinal({ ...state, shots: fullShots }))
+    // The effects are made again on the full-resolution shots, from the faces found on the smaller copies.
+    const full = await Promise.all(
+      fullShots.map((s, i) => applyEffects(s, scaleFaces(rawFaces?.[i], s.width / baseShots[i].width), fxOptions(i)).catch(() => ({ shot: s }))),
+    )
+    countPhoto({ ...edit, layout, clones: fxOptions(0).clones })
+    onFinish(await renderFinal({ ...state, shots: full.map((r) => r.shot), fronts: full.map((r) => r.front) }))
   }
 
   return (
@@ -620,6 +667,31 @@ export default function Edit({ custom = [], faceCustom = [], hidden = [], groups
                   ))}
                 </div>
               )}
+              {edit.theme === 'naruto' && (
+                <div className="fx-row clones">
+                  <span className="fx-label">{t('fx.clones')}</span>
+                  <div className="chips" role="group" aria-label={t('fx.clones')}>
+                    {CLONE_COUNTS.map((n) => (
+                      <button key={n} data-sfx="none" aria-pressed={(edit.clones || 0) === n} className={`chip ${(edit.clones || 0) === n ? 'on' : ''}`} onClick={() => setClones(n)}>
+                        {n ? t('fx.clonesN', { n }) : t('fx.off')}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {faceCount > 0 && (
+                <div className="fx-row">
+                  <span className="fx-label">{t('fx.head')}</span>
+                  <div className="chips" role="group" aria-label={t('fx.head')}>
+                    {['normal', ...Object.keys(HEAD_SIZES)].map((mode) => (
+                      <button key={mode} data-sfx="none" aria-pressed={headOn(mode)} disabled={!realTargets.length} className={`chip ${headOn(mode) ? 'on' : ''}`} onClick={() => setHead(mode)}>
+                        {t(`fx.head.${mode}`)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {fxBusy && <p className="note" role="status">{t('fx.working')}</p>}
               <div className="grid stickers">
                 {faceItems.map((item) => (
                   <button key={item.id} data-sfx="none" className={`opt sticker ${targets.length && onFace(item) === targets.length * (PARTS[item.anchor] || 1) ? 'on' : ''}`} disabled={!targets.length} onClick={() => toggleFace(item)}>

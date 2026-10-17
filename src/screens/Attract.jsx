@@ -8,6 +8,7 @@ import { FACE_STICKERS } from '../faces.js'
 import { setPin } from '../pin.js'
 import PinPad from './PinPad.jsx'
 import CameraPicker from './CameraPicker.jsx'
+import Stats from './Stats.jsx'
 import { LANGS, useI18n } from '../i18n.jsx'
 import { useIdle } from '../useIdle.js'
 import { showHands, watchFrame } from '../gestures.js'
@@ -279,6 +280,12 @@ function Settings({ cam, custom, booth, updateBooth, onClose, onTestFiles }) {
           {!!booth.sound && <button className="btn btn-ghost" data-sfx="none" onClick={sfx.success}>Test sound</button>}
           <span className="note">No sound? Check the computer's volume and that this browser tab is not muted.</span>
         </div>
+        <div className="field">
+          <label className="check">
+            <input type="checkbox" checked={!!booth.posePrompts} onChange={(e) => updateBooth({ posePrompts: e.target.checked ? 1 : 0 })} />
+            Pose challenges: show a fun pose to try ("superhero pose", "group hug"...) before each shot
+          </label>
+        </div>
         {!!(booth.gestureShutter || booth.gestureZoom || booth.frameStart) && (
           <div className="field">
             <label className="check">
@@ -442,6 +449,7 @@ function Settings({ cam, custom, booth, updateBooth, onClose, onTestFiles }) {
           Test: use my own picture
           <input type="file" accept="image/*" multiple hidden onChange={(e) => { onTestFiles([...e.target.files]); e.target.value = '' }} />
         </label>
+        <Stats />
         <div className="field">
           Change operator PIN
           <div className="row-tight">

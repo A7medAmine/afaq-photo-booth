@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import QRCode from 'qrcode'
 import { useI18n } from '../i18n.jsx'
 import { sfx } from '../sound.js'
+import { count } from '../stats.js'
 
 const CLOUD = (import.meta.env.VITE_CLOUD_URL || '').replace(/\/$/, '')
 const KEY = import.meta.env.VITE_UPLOAD_KEY || ''
@@ -52,6 +53,8 @@ export default function Done({ final, share, onShare, booth, editsLeft, extendsL
       if (!res.ok) throw new Error(`Upload failed (${res.status})`)
       const { id, token, url, ttlMinutes } = await res.json()
       if (share?.id) fetch(`${CLOUD}/api/photos/${share.id}`, { method: 'DELETE', headers: headers({ 'X-Token': share.token }) }).catch(() => {})
+      // A second pass through the editor replaces the photo, so it is not counted again.
+      if (!share?.id) count('uploads')
       onShare({ id, token, keep: !!share?.keep })
       setTtl(ttlMinutes)
       setLink(url)

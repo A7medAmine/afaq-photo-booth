@@ -57,14 +57,72 @@ function grab(video, w, h) {
   })
 }
 
+// With several guests in view only the person nearest the camera (the biggest hands) is in
+// control: watchers see just that person's one or two hands, so neighbours' signs never mix in.
+// Control moves to someone else when their hand is clearly bigger, or once the leader has gone.
+const TAKEOVER = 1.25
+// A leader hand missing this long (blur, a hand lowered for a moment) hands control on.
+const LEAD_GRACE_MS = 500
+// The leader's other hand is the nearest one about as big (as far from the camera),
+// within this many palm lengths.
+const PARTNER_REACH = 3.5
+
+// The longest of three palm lines, so a hand turned sideways still measures close to its size.
+function palmSize(hand, aspect) {
+  const d = (a, b) => Math.hypot((hand[a].x - hand[b].x) * aspect, hand[a].y - hand[b].y)
+  return Math.max(d(0, 5), d(0, 9), d(0, 17))
+}
+
+// Returns the indices of the leader's hands in res, updating the leader kept on the loop.
+function pickLead(res, aspect, l, now) {
+  const hands = res.landmarks
+  const side = res.handedness || []
+  const size = hands.map((h) => palmSize(h, aspect))
+  const wrist = (i) => ({ x: hands[i][0].x * aspect, y: hands[i][0].y })
+  const gap = (a, b) => Math.hypot(a.x - b.x, a.y - b.y)
+  // Handedness is often misread when hands overlap, so a same-side hand only counts as further away.
+  const partnerOf = (i) => {
+    let best = -1
+    let bestGap = Infinity
+    hands.forEach((_, j) => {
+      if (j === i || size[j] < size[i] * 0.75) return
+      const g = gap(wrist(i), wrist(j)) * (side[i] && side[i] === side[j] ? 2 : 1)
+      if (g < size[i] * PARTNER_REACH && g < bestGap) [best, bestGap] = [j, g]
+    })
+    return best
+  }
+  const team = (i) => [i, partnerOf(i)].filter((j) => j >= 0)
+  // The leader's hand this frame is the one nearest to where a leader hand was last frame.
+  let lead = -1
+  if (l.lead) {
+    let bestGap = Infinity
+    hands.forEach((_, i) => {
+      const g = Math.min(...l.lead.wrists.map((w) => gap(wrist(i), w)))
+      if (g < size[i] * 1.5 && g < bestGap) [lead, bestGap] = [i, g]
+    })
+    if (lead < 0 && now - l.lead.seen <= LEAD_GRACE_MS) return []
+  }
+  let set = lead >= 0 ? team(lead) : []
+  const biggest = size.indexOf(Math.max(...size))
+  if (biggest >= 0 && !set.includes(biggest) && (!set.length || size[biggest] > Math.max(...set.map((i) => size[i])) * TAKEOVER)) {
+    set = team(biggest)
+    l.leadId++
+  }
+  l.lead = set.length ? { wrists: set.map(wrist), seen: now } : null
+  return set
+}
+
 // One recognition loop per video, shared by every watcher, so the shutter and zoom
 // watchers do not each run the model on the same frame.
 const loops = new Map()
 
-function onHands(video, fn) {
+// fn(res, now, aspect) gets only the leader's hands (see pickLead), with res.leadId changing
+// whenever control moves to someone else. With all, fn gets every hand and res.lead, the
+// indices of the leader's.
+function onHands(video, fn, { all = false } = {}) {
   let loop = loops.get(video)
   if (!loop) {
-    loop = { subs: new Set(), raf: 0, stopped: false, busy: false }
+    loop = { subs: new Map(), raf: 0, stopped: false, busy: false, lead: null, leadId: 0 }
     loops.set(video, loop)
     const l = loop
     let last = 0
@@ -82,14 +140,19 @@ function onHands(video, fn) {
           l.busy = false
           if (res && !l.stopped) {
             const t = performance.now()
-            l.subs.forEach((f) => f(res, t, DETECT_W / h))
+            const aspect = DETECT_W / h
+            const lead = pickLead(res, aspect, l, t)
+            const pick = (list) => lead.map((i) => list?.[i])
+            const focused = { landmarks: pick(res.landmarks), gestures: pick(res.gestures), handedness: pick(res.handedness), leadId: l.leadId }
+            const everyone = { ...res, lead }
+            l.subs.forEach((all, f) => f(all ? everyone : focused, t, aspect))
           }
         })
         .catch(() => { l.busy = false })
     }
     l.raf = requestAnimationFrame(tick)
   }
-  loop.subs.add(fn)
+  loop.subs.set(fn, all)
   const l = loop
   return () => {
     l.subs.delete(fn)
@@ -199,8 +262,9 @@ const HAND_CONNECTIONS = [[0, 1], [1, 2], [2, 3], [3, 4], [0, 5], [5, 6], [6, 7]
 const GESTURE_EMOJI = { Victory: '✌️', Thumb_Up: '👍', Thumb_Down: '👎', Open_Palm: '✋', Closed_Fist: '✊', Pointing_Up: '☝️', ILoveYou: '🤟' }
 
 // Draws every tracked hand (green joints and dots) and the sign it is read as, so guests
-// can see what the booth sees. Landmarks are flipped and zoomed in code rather than with
-// CSS so they line up with the preview and the labels stay readable.
+// can see what the booth sees; hands other than the leader's are dimmed. Landmarks are
+// flipped and zoomed in code rather than with CSS so they line up with the preview and the
+// labels stay readable.
 // getZoom() returns the preview's current zoom. cover matches a video shown with
 // object-fit: cover, whose edges are cropped. Returns a stop function that clears the canvas.
 export function showHands(video, overlay, { mirror = false, getZoom = () => 1, cover = false }) {
@@ -224,6 +288,8 @@ export function showHands(video, overlay, { mirror = false, getZoom = () => 1, c
     const line = Math.max(2, w / 320)
     res.landmarks.forEach((hand, i) => {
       const pts = hand.map((p) => ({ ...p, x: 0.5 + ((mirror ? 1 - p.x : p.x) - 0.5) * zx, y: 0.5 + (p.y - 0.5) * zy }))
+      // Guests further back show dimmed: only the leader's signs count.
+      ctx.globalAlpha = res.lead.includes(i) ? 1 : 0.35
       ctx.strokeStyle = '#39ff6a'
       ctx.lineWidth = line
       ctx.beginPath()
@@ -255,7 +321,8 @@ export function showHands(video, overlay, { mirror = false, getZoom = () => 1, c
       ctx.strokeText(label, top.x * w, y)
       ctx.fillText(label, top.x * w, y)
     })
-  })
+    ctx.globalAlpha = 1
+  }, { all: true })
   return () => {
     stop()
     clear()
@@ -310,7 +377,15 @@ export function watchZoom(video, { start = 1, onZoom }) {
   let seen = 0
   let shutSince = 0
   let armedSince = 0
+  let leadId = null
   return onHands(video, (res, now, aspect) => {
+    // A new leader starts their own grip instead of carrying on from the last one's fingers.
+    if (res.leadId !== leadId) {
+      leadId = res.leadId
+      base = null
+      shutSince = 0
+      armedSince = 0
+    }
     let r = null
     if (!cloneSign(res, aspect)) {
       res.landmarks.forEach((hand, i) => {
