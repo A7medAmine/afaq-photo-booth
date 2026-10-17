@@ -9,6 +9,7 @@ import { setPin } from '../pin.js'
 import PinPad from './PinPad.jsx'
 import CameraPicker from './CameraPicker.jsx'
 import Stats from './Stats.jsx'
+import SavedPhotos from './SavedPhotos.jsx'
 import { LANGS, useI18n } from '../i18n.jsx'
 import { useIdle } from '../useIdle.js'
 import { showHands, watchFrame } from '../gestures.js'
@@ -450,6 +451,7 @@ function Settings({ cam, custom, booth, updateBooth, onClose, onTestFiles }) {
           <input type="file" accept="image/*" multiple hidden onChange={(e) => { onTestFiles([...e.target.files]); e.target.value = '' }} />
         </label>
         <Stats />
+        <SavedPhotos />
         <div className="field">
           Change operator PIN
           <div className="row-tight">

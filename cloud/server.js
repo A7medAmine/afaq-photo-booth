@@ -255,6 +255,32 @@ app.put('/api/photos/:id/keep', express.json(), (req, res) => {
   res.json({ keep })
 })
 
+// Operator view of the photos guests let the club keep, newest first. Uses the booth's upload key.
+const operator = (req) => !UPLOAD_KEY || req.get('X-Upload-Key') === UPLOAD_KEY
+
+app.get('/api/kept', (req, res) => {
+  if (!operator(req)) return res.sendStatus(401)
+  const ids = new Set()
+  for (const name of fs.readdirSync(DATA_DIR)) {
+    const id = /^(.+?)(\.p)?\.jpg$/.exec(name)?.[1]
+    if (id && isId(id)) ids.add(id)
+  }
+  const photos = [...ids].map((id) => {
+    const at = locate(id)
+    const born = Math.min(...at.variants.map((v) => fs.statSync(keptFile(id, v)).mtimeMs))
+    return { id, at: born, url: `${baseUrl(req)}/p/${id}` }
+  })
+  res.json({ photos: photos.sort((a, b) => b.at - a.at) })
+})
+
+app.delete('/api/kept/:id', (req, res) => {
+  const { id } = req.params
+  if (!operator(req)) return res.sendStatus(401)
+  if (!isId(id)) return res.sendStatus(400)
+  for (const v of VARIANTS) fs.rmSync(keptFile(id, v), { force: true })
+  res.sendStatus(204)
+})
+
 app.delete('/api/photos/:id', (req, res) => {
   const { id } = req.params
   if (!isId(id) || !allowed(req, id)) return res.sendStatus(403)

@@ -1044,3 +1044,9 @@ html[lang="ar"] .panel-foot .btn.big { font-size: 28px; padding: 10px 14px; }
 .stats-bar { display: grid; grid-template-columns: minmax(0, 7em) 1fr auto; gap: 8px; align-items: center; font-weight: 500; font-size: 15px; }
 .stats-bar > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-transform: capitalize; }
 .stats-fill { height: 12px; border-radius: 6px; background: linear-gradient(90deg, var(--sun) calc(var(--w) * 100%), rgb(3 10 46 / 0.08) 0); }
+
+/* Photos guests let the club keep, in the operator settings. */
+.saved-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+.saved-item { display: grid; gap: 6px; padding: 8px; border: 3px solid var(--ink); border-radius: 14px; background: #fff; font-size: 13px; font-weight: 600; }
+.saved-item img { width: 100%; aspect-ratio: 3 / 4; object-fit: cover; border-radius: 8px; background: rgb(3 10 46 / 0.08); }
+.saved-item .row-tight .btn { flex: 1; font-size: 14px; padding: 6px 8px; text-align: center; text-decoration: none; }
