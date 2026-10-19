@@ -61,7 +61,9 @@ export function useBoothSettings() {
     setBooth((b) => {
       const next = { ...b }
       for (const [k, v] of Object.entries(patch)) {
-        const [lo, hi] = SESSION_LIMITS[k]
+        const limits = SESSION_LIMITS[k]
+        if (!limits) continue
+        const [lo, hi] = limits
         if (Number.isFinite(v)) next[k] = Math.min(hi, Math.max(lo, Math.round(v)))
       }
       try { localStorage.setItem(LS, JSON.stringify(next)) } catch { /* private mode */ }
