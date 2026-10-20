@@ -129,7 +129,7 @@ function Settings({ cam, custom, booth, updateBooth, onClose, onTestFiles }) {
     for (const [dir, fs] of byDir) custom.add(fs, custom.addGroup(dir.slice(0, 16)))
   }
   const [newPin, setNewPin] = useState('')
-  const [pinSaved, setPinSaved] = useState(false)
+  const [pinStatus, setPinStatus] = useState('')
   useEffect(() => {
     if (picking) return
     const k = (e) => e.key === 'Escape' && onClose()
@@ -461,17 +461,18 @@ function Settings({ cam, custom, booth, updateBooth, onClose, onTestFiles }) {
               maxLength={4}
               placeholder="4 digits"
               value={newPin}
-              onChange={(e) => { setNewPin(e.target.value.replace(/\D/g, '')); setPinSaved(false) }}
+              onChange={(e) => { setNewPin(e.target.value.replace(/\D/g, '')); setPinStatus('') }}
             />
             <button
               className="btn btn-ghost"
               disabled={newPin.length !== 4}
-              onClick={() => { setPin(newPin); setNewPin(''); setPinSaved(true) }}
+              onClick={() => { setPin(newPin).then((ok) => setPinStatus(ok ? 'saved' : 'error')); setNewPin('') }}
             >
               Save PIN
             </button>
           </div>
-          {pinSaved && <span className="note">PIN changed.</span>}
+          {pinStatus === 'saved' && <span className="note">PIN changed.</span>}
+          {pinStatus === 'error' && <span className="note">Could not save PIN to storage.</span>}
         </div>
         <p className="note">Photos upload to: {import.meta.env.VITE_CLOUD_URL || 'this server (local cloud)'}</p>
         <footer className="modal-foot">

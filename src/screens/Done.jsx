@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import QRCode from 'qrcode'
 import { useI18n } from '../i18n.jsx'
 import { sfx } from '../sound.js'
@@ -25,6 +25,9 @@ export default function Done({ final, share, onShare, booth, editsLeft, extendsL
   const fullUrl = useMemo(() => URL.createObjectURL(final.full), [final])
   useEffect(() => () => [preview, fullUrl].forEach((u) => URL.revokeObjectURL(u)), [preview, fullUrl])
 
+  const alive = useRef(true)
+  useEffect(() => () => { alive.current = false }, [])
+
   const sendFull = async (id, token) => {
     setFullStatus('sending')
     for (let attempt = 0; attempt < 3; attempt++) {
@@ -34,12 +37,13 @@ export default function Done({ final, share, onShare, booth, editsLeft, extendsL
           headers: headers({ 'Content-Type': 'image/jpeg', 'X-Token': token }),
           body: final.full,
         })
+        if (!alive.current) return
         if (r.ok) return setFullStatus('done')
         if (r.status < 500) break
       } catch { /* retry */ }
       await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)))
     }
-    setFullStatus('failed')
+    if (alive.current) setFullStatus('failed')
   }
 
   const upload = useCallback(async () => {
@@ -55,16 +59,21 @@ export default function Done({ final, share, onShare, booth, editsLeft, extendsL
       if (share?.id) fetch(`${CLOUD}/api/photos/${share.id}`, { method: 'DELETE', headers: headers({ 'X-Token': share.token }) }).catch(() => {})
       // A second pass through the editor replaces the photo, so it is not counted again.
       if (!share?.id) count('uploads')
+      if (!alive.current) return
       onShare({ id, token, keep: !!share?.keep })
       setTtl(ttlMinutes)
       setLink(url)
       sendFull(id, token)
-      setQr(await QRCode.toDataURL(url, { width: 640, margin: 1, color: { dark: '#030a2e', light: '#ffffff' } }))
+      const dataUrl = await QRCode.toDataURL(url, { width: 640, margin: 1, color: { dark: '#030a2e', light: '#ffffff' } })
+      if (!alive.current) return
+      setQr(dataUrl)
       setStatus('ready')
       sfx.success()
     } catch {
-      setStatus('error')
-      sfx.error()
+      if (alive.current) {
+        setStatus('error')
+        sfx.error()
+      }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [final])
@@ -80,7 +89,7 @@ export default function Done({ final, share, onShare, booth, editsLeft, extendsL
   }, [status])
 
   useEffect(() => {
-    if (left <= 0) onNext()
+    if (left <= 0 && alive.current) onNext()
   }, [left, onNext])
 
   const toggleKeep = async (on) => {

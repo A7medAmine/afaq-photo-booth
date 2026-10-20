@@ -7,7 +7,9 @@ const RETRY_MS = 3000
 
 function loadSettings() {
   try {
-    return { ...DEFAULTS, ...JSON.parse(localStorage.getItem(LS) || '{}') }
+    const saved = { ...DEFAULTS, ...JSON.parse(localStorage.getItem(LS) || '{}') }
+    if (saved.phoneUrl) saved.phoneUrl = normalizePhoneUrl(saved.phoneUrl)
+    return saved
   } catch {
     return { ...DEFAULTS }
   }
